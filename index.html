@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CIK Lookup</title>
+    <script>
+        async function getCik() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ticker = urlParams.get('ticker');
+            
+            if (!ticker) {
+                document.body.innerHTML = "Error: No ticker provided.";
+                return;
+            }
+
+            try {
+                const response = await fetch('cik_tickers.json');
+                const data = await response.json();
+                const cik = data[ticker.toLowerCase()];
+
+                if (cik) {
+                    document.body.innerHTML = JSON.stringify({ cik });
+                } else {
+                    document.body.innerHTML = JSON.stringify({ error: "CIK not found" });
+                }
+            } catch (error) {
+                document.body.innerHTML = "Error loading data.";
+            }
+        }
+    </script>
+</head>
+<body onload="getCik()">
+</body>
+</html>
