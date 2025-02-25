@@ -1,11 +1,9 @@
 from flask import Flask, request, jsonify
 import json
-from flask_cors import CORS  # Add CORS
 
 app = Flask(__name__)
-CORS(app)  # Allow all origins
 
-# Load JSON files
+# Load JSON datasets (adjust file paths if necessary)
 with open("cik_tickers.json", "r") as f:
     ticker_lookup = json.load(f)
 
@@ -14,16 +12,19 @@ with open("cik_names.json", "r") as f:
 
 @app.route("/cik_lookup", methods=["GET"])
 def get_cik():
-    query = request.args.get("query", "").strip().lower()
+    query = request.args.get("query", "").strip().lower()  # Convert input to lowercase
 
-    if not query:
-        return jsonify({"error": "Query parameter is required."}), 400
+    # Try exact match first (case-insensitive)
+    if query in {key.lower(): value for key, value in ticker_lookup.items()}:
+        return jsonify({"cik": ticker_lookup[query.upper()]})  # Return CIK for ticker match
 
-    if query in ticker_lookup:
-        return jsonify({"cik": ticker_lookup[query]})
+    if query in {key.lower(): value for key, value in name_lookup.items()}:
+        return jsonify({"cik": name_lookup[query.title()]})  # Return CIK for exact company name match
 
-    if query in name_lookup:
-        return jsonify({"cik": name_lookup[query]})
+    # Try partial name match (e.g., "Tesla" should match "Tesla Inc.")
+    for name, cik in name_lookup.items():
+        if query in name.lower():
+            return jsonify({"cik": cik})
 
     return jsonify({"error": "CIK not found."}), 404
 
