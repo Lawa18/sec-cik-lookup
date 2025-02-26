@@ -1,18 +1,20 @@
 from flask import Flask, request, jsonify
 import json
+import os
 
 app = Flask(__name__)
 
-# Load JSON datasets
-try:
-    with open("cik_tickers.json", "r") as f:
-        ticker_lookup = json.load(f)
-    with open("cik_names.json", "r") as f:
-        name_lookup = json.load(f)
-except Exception as e:
-    print(f"Error loading JSON files: {e}")
-    ticker_lookup = {}
-    name_lookup = {}
+# Load JSON datasets with error handling
+def load_json(filename):
+    try:
+        with open(filename, "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading {filename}: {e}")
+        return {}
+
+ticker_lookup = load_json("cik_tickers.json")
+name_lookup = load_json("cik_names.json")
 
 @app.route("/cik_lookup", methods=["GET"])
 def get_cik():
@@ -21,7 +23,7 @@ def get_cik():
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
 
-    if query in ticker_lookup:
+    if query in {key.lower(): value for key, value in ticker_lookup.items()}:
         return jsonify({"cik": ticker_lookup[query.upper()]})
 
     if query in {key.lower(): value for key, value in name_lookup.items()}:
