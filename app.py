@@ -25,7 +25,30 @@ def get_cik():
         sec_response = requests.get(sec_url, headers=headers)
 
         if sec_response.status_code == 200:
-            return sec_response.json()
+            data = sec_response.json()
+
+            # Extract latest 10-K or 10-Q filing
+            recent_filings = data.get("filings", {}).get("recent", {})
+            forms = recent_filings.get("form", [])
+            urls = recent_filings.get("primaryDocument", [])
+            dates = recent_filings.get("filingDate", [])
+
+            # Find the latest 10-K or 10-Q
+            for i, form in enumerate(forms):
+                if form in ["10-K", "10-Q"]:
+                    filing_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{urls[i]}"
+                    return jsonify({
+                        "cik": cik,
+                        "company": data.get("name", "Unknown"),
+                        "latest_filing": {
+                            "formType": form,
+                            "filingDate": dates[i],
+                            "filingUrl": filing_url
+                        }
+                    })
+
+            return jsonify({"error": "No 10-K or 10-Q found."}), 404
+        
         else:
             return jsonify({"error": "SEC API request failed.", "status": sec_response.status_code}), sec_response.status_code
 
