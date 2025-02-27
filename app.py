@@ -12,7 +12,7 @@ def load_json(filename):
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-# Load datasets
+# Load CIK dataset
 ticker_lookup = load_json("cik_tickers.json")
 
 @app.route("/financials", methods=["GET"])
@@ -25,7 +25,7 @@ def get_financials():
     # Convert dictionary keys to lowercase for case-insensitive search
     ticker_dict = {key.lower(): value for key, value in ticker_lookup.items()}
 
-    # Lookup by exact ticker or full company name
+    # Lookup by exact ticker or company name
     cik = ticker_dict.get(query)
 
     # Try partial match if no exact match (e.g., "Tesla" should match "Tesla Inc.")
@@ -52,26 +52,45 @@ def get_financials():
 
     data = sec_response.json()
 
-    # Extract the latest 10-K or 10-Q filing
-    recent_filings = data.get("filings", {}).get("recent", {})
-    forms = recent_filings.get("form", [])
-    urls = recent_filings.get("primaryDocument", [])
-    dates = recent_filings.get("filingDate", [])
+    # Extract recent financial filings
+    filings = data.get("filings", {}).get("recent", {})
+    forms = filings.get("form", [])
+    urls = filings.get("primaryDocument", [])
+    dates = filings.get("filingDate", [])
 
+    # Find latest 10-K or 10-Q
+    filing_url = None
+    full_text = "No report found."
     for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
             filing_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{urls[i]}"
-            return jsonify({
-                "cik": cik,
-                "company": data.get("name", "Unknown"),
-                "latest_filing": {
-                    "formType": form,
-                    "filingDate": dates[i],
-                    "filingUrl": filing_url
-                }
-            })
+            full_text = fetch_filing_text(filing_url)  # Fetch the full document
+            break
 
-    return jsonify({"error": "No 10-K or 10-Q found."}), 404
+    if not filing_url:
+        return jsonify({"error": "No 10-K or 10-Q found."}), 404
+
+    # Structured financial data
+    structured_data = {
+        "company": data.get("name", "Unknown"),
+        "cik": cik,
+        "latest_filing": {
+            "formType": form,
+            "filingDate": dates[i],
+            "filingUrl": filing_url,
+            "fullText": full_text[:5000]  # Limit response to 5000 characters for performance
+        }
+    }
+
+    return jsonify(structured_data)
+
+def fetch_filing_text(url):
+    """Fetches full text of SEC 10-K/10-Q filing from a given URL."""
+    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.text
+    return "Error fetching report."
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
