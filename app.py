@@ -27,7 +27,7 @@ def get_financials():
 
     # Exact match lookup
     cik = ticker_dict.get(query)
-    
+
     # Partial match (e.g., "Tesla" should match "Tesla Inc.")
     if not cik:
         for name, cik_value in ticker_dict.items():
