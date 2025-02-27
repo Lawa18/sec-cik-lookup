@@ -85,12 +85,10 @@ def get_financials():
     return jsonify(structured_data)
 
 def fetch_filing_text(url):
-    """Fetches full text of SEC 10-K/10-Q filing from a given URL."""
+    """Fetches first 5000 characters of SEC 10-K/10-Q filing from a given URL."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        return response.text
+        return response.text[:5000]  # Limit response to avoid timeout
     return "Error fetching report."
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
