@@ -25,10 +25,10 @@ def get_financials():
     # Convert dictionary keys to lowercase for case-insensitive search
     ticker_dict = {key.lower(): value for key, value in ticker_lookup.items()}
 
-    # Exact match lookup
+    # Lookup by exact ticker or full company name
     cik = ticker_dict.get(query)
 
-    # Partial match (e.g., "Tesla" should match "Tesla Inc.")
+    # Try partial match if no exact match (e.g., "Tesla" should match "Tesla Inc.")
     if not cik:
         for name, cik_value in ticker_dict.items():
             if query in name.lower():
