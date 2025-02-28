@@ -1,9 +1,11 @@
 import requests
 from flask import Flask, request, jsonify
 import json
+from flask_cors import CORS  # Enable CORS for OpenAI API access
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)  # Allow cross-origin requests
 
 # Function to load JSON safely
 def load_json(filename):
@@ -22,7 +24,7 @@ def get_financials():
 
     # Load datasets
     ticker_dict = load_json("cik_tickers.json")
-    company_dict = load_json("cik_names.json")  
+    company_dict = load_json("cik_names.json")  # Corrected file name
 
     # Convert keys to lowercase for case-insensitive search
     ticker_dict = {key.lower(): value for key, value in ticker_dict.items()}
@@ -44,12 +46,15 @@ def get_financials():
     # Fetch financial data from SEC
     sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     headers = {
-        "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",
+        "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",  # REQUIRED by SEC API
         "Accept": "application/json"
     }
-    
+
     sec_response = requests.get(sec_url, headers=headers)
 
+    # Handle SEC API errors
+    if sec_response.status_code == 403:
+        return jsonify({"error": "SEC API blocked request (403 Forbidden). Check User-Agent header."}), 403
     if sec_response.status_code != 200:
         return jsonify({"error": "Failed to fetch SEC data.", "status": sec_response.status_code}), sec_response.status_code
 
