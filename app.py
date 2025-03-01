@@ -24,16 +24,19 @@ def get_financials():
 
     # Load datasets
     ticker_dict = load_json("cik_tickers.json")
-    company_dict = load_json("cik_names.json")  # Corrected file name
+    company_dict = load_json("cik_names.json")
+
+    # Debugging: Print all keys to confirm Tesla exists
+    print("DEBUG: Checking for Tesla in dataset:", ticker_dict.keys())
 
     # Convert keys to lowercase for case-insensitive search
     ticker_dict = {key.lower(): value for key, value in ticker_dict.items()}
     company_dict = {key.lower(): value for key, value in company_dict.items()}
 
-    # Lookup by exact ticker or company name
+    # Exact match lookup
     cik = ticker_dict.get(query) or company_dict.get(query)
 
-    # Partial match (if no exact match)
+    # Partial match lookup (if exact match fails)
     if not cik:
         for name, cik_value in company_dict.items():
             if query in name:
@@ -42,6 +45,8 @@ def get_financials():
 
     if not cik:
         return jsonify({"error": "CIK not found."}), 404
+
+    return jsonify({"cik": cik})
 
     # Fetch financial data from SEC
     sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
