@@ -9,28 +9,38 @@ CORS(app)  # Allow cross-origin requests
 
 # Function to load JSON safely
 def load_json(filename):
-    """Loads a JSON file safely and converts it into a lookup dictionary."""
+    """Loads cik_names.json and creates lookup dictionaries for tickers and company names."""
     try:
         with open(filename, "r") as f:
             data = json.load(f)
 
-            # Convert list format into a dictionary with both ticker and title as keys
+            print(f"DEBUG: Loaded {filename}, total entries: {len(data)}")
+
+            # Check if data is a dictionary
+            if not isinstance(data, dict):
+                print(f"ERROR: {filename} is not a dictionary! It is a {type(data)}.")
+                return {}, {}
+
             cik_by_ticker = {}
             cik_by_company = {}
 
-            for item in data.values():  # Loop through indexed dictionary
+            for key, item in data.items():  # Loop through indexed dictionary
+                if not isinstance(item, dict) or "cik_str" not in item or "ticker" not in item or "title" not in item:
+                    print(f"ERROR: Invalid format at key {key}: {item}")
+                    continue  # Skip invalid entries
+
                 cik_str = str(item["cik_str"]).zfill(10)  # Convert CIK to string with leading zeros
                 cik_by_ticker[item["ticker"].lower()] = cik_str
                 cik_by_company[item["title"].lower()] = cik_str
 
-            print(f"SUCCESS: Loaded {filename}, {len(cik_by_company)} company names and {len(cik_by_ticker)} tickers.")
+            print(f"SUCCESS: Processed {len(cik_by_company)} companies and {len(cik_by_ticker)} tickers.")
 
             return cik_by_ticker, cik_by_company
 
-    except (FileNotFoundError, json.JSONDecodeError):
-        print(f"ERROR: Could not load {filename} due to a JSON error.")
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"ERROR: Could not load {filename}. Exception: {e}")
         return {}, {}
-
+        
 @app.route("/financials", methods=["GET"])
 def get_financials():
     query = request.args.get("query", "").strip().lower()
@@ -38,23 +48,19 @@ def get_financials():
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
 
-    # Load datasets
-    ticker_dict = load_json("cik_tickers.json")
-    company_dict = load_json("cik_names.json")
+    # Load the CIK database (single file)
+    cik_by_ticker, cik_by_company = load_json("cik_names.json")
 
-    # Debugging: Print all keys to confirm Tesla exists
-    print("DEBUG: Checking for Tesla in dataset:", ticker_dict.keys())
+    # If files failed to load, return error
+    if not cik_by_ticker or not cik_by_company:
+        return jsonify({"error": "Failed to load CIK database. Check JSON format."}), 500
 
-    # Convert keys to lowercase for case-insensitive search
-    ticker_dict = {key.lower(): value for key, value in ticker_dict.items()}
-    company_dict = {key.lower(): value for key, value in company_dict.items()}
+    # Exact match lookup (first try ticker, then company name)
+    cik = cik_by_ticker.get(query) or cik_by_company.get(query)
 
-    # Exact match lookup
-    cik = ticker_dict.get(query) or company_dict.get(query)
-
-    # Partial match lookup (if exact match fails)
+    # Partial match (if no exact match)
     if not cik:
-        for name, cik_value in company_dict.items():
+        for name, cik_value in cik_by_company.items():
             if query in name:
                 cik = cik_value
                 break
