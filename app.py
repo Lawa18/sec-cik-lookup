@@ -9,11 +9,27 @@ CORS(app)  # Allow cross-origin requests
 
 # Function to load JSON safely
 def load_json(filename):
+    """Loads a JSON file safely and converts it into a lookup dictionary."""
     try:
         with open(filename, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+
+            # Convert list format into a dictionary with both ticker and title as keys
+            cik_by_ticker = {}
+            cik_by_company = {}
+
+            for item in data.values():  # Loop through indexed dictionary
+                cik_str = str(item["cik_str"]).zfill(10)  # Convert CIK to string with leading zeros
+                cik_by_ticker[item["ticker"].lower()] = cik_str
+                cik_by_company[item["title"].lower()] = cik_str
+
+            print(f"SUCCESS: Loaded {filename}, {len(cik_by_company)} company names and {len(cik_by_ticker)} tickers.")
+
+            return cik_by_ticker, cik_by_company
+
     except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        print(f"ERROR: Could not load {filename} due to a JSON error.")
+        return {}, {}
 
 @app.route("/financials", methods=["GET"])
 def get_financials():
