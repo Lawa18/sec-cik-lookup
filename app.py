@@ -129,7 +129,7 @@ def find_xbrl_url(index_url):
 from lxml import etree
 
 def extract_summary(xbrl_url):
-    """Extracts key financial data from XBRL SEC filings."""
+    """Extracts key financial data from the correct XBRL SEC filing."""
     if not xbrl_url:
         return "No XBRL file found."
 
@@ -140,17 +140,16 @@ def extract_summary(xbrl_url):
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
     try:
-        # Parse XBRL using lxml
+        # Parse XBRL file using lxml
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        # Extract all namespace mappings dynamically
+        # Extract namespaces
         namespaces = {k: v for k, v in tree.nsmap.items() if k}
 
-        # Print namespace mappings for debugging
         print(f"DEBUG: Namespaces detected: {namespaces}")
 
-        # Extract key financial metrics using namespaces
+        # Extract financial metrics using namespaces
         financial_summary = {
             "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
             "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
