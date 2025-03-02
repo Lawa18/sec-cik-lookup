@@ -78,16 +78,20 @@ def get_financials():
     latest_filing = None
     for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
-            # Construct SEC URL correctly
-            folder_name = accession_numbers[i].replace("-", "")  # Remove dashes from accessionNumber
+            folder_name = accession_numbers[i].replace("-", "")
             base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
-            filing_main_url = f"{base_url}/{urls[i]}"  # Main document
+            filing_main_url = f"{base_url}/{urls[i]}"  # Main filing document
+            filing_index_url = f"{base_url}/index.json"  # JSON index of all documents in the filing
+
+            # Fetch filing index to find the XBRL file
+            xbrl_url = find_xbrl_url(filing_index_url)
 
             latest_filing = {
                 "formType": form,
                 "filingDate": dates[i],
                 "filingUrl": filing_main_url,
-                "summary": extract_summary(filing_main_url)
+                "xbrlUrl": xbrl_url,
+                "summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
             }
             break
 
@@ -100,29 +104,40 @@ def get_financials():
         "latest_filing": latest_filing
     })
 
-from bs4 import BeautifulSoup
 from lxml import etree
 
-def extract_summary(filing_url):
-    """Extracts key financial data from XBRL-formatted SEC filings."""
+def find_xbrl_url(index_url):
+    """Fetches SEC index.json and finds the XBRL file."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(filing_url, headers=headers)
+    response = requests.get(index_url, headers=headers)
 
     if response.status_code != 200:
-        return "Error fetching financial report."
+        return None
 
-    # Convert HTML/XBRL to text
-    soup = BeautifulSoup(response.text, "html.parser")
+    try:
+        index_data = response.json()
+        for file in index_data["directory"]["item"]:
+            if file["name"].endswith(".xml") or file["name"].endswith(".xbrl"):
+                return f"{index_url.rsplit('/', 1)[0]}/{file['name']}"  # Construct full XBRL file URL
+    except Exception as e:
+        print(f"Error parsing index.json: {e}")
 
-    # Try to find XBRL structured data
-    xbrl_data = soup.find("ix:nonNumeric") or soup.find("ix:nonFraction")
+    return None
 
-    if not xbrl_data:
-        return "No structured financial data found in filing."
+def extract_summary(xbrl_url):
+    """Extracts key financial data from XBRL SEC filings."""
+    if not xbrl_url:
+        return "No XBRL file found."
+
+    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+    response = requests.get(xbrl_url, headers=headers)
+
+    if response.status_code != 200:
+        return "Error fetching XBRL report."
 
     # Parse XBRL using lxml
     parser = etree.XMLParser(recover=True)
-    tree = etree.fromstring(str(soup), parser=parser)
+    tree = etree.fromstring(response.content, parser=parser)
 
     # Extract key financial metrics
     financial_summary = {
