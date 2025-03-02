@@ -104,6 +104,8 @@ def get_financials():
         "latest_filing": latest_filing
     })
 
+from lxml import etree
+
 def find_xbrl_url(index_url):
     """Fetches SEC index.json and finds the correct XBRL financial file."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
