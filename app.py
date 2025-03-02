@@ -11,11 +11,15 @@ CORS(app, origins=["*"])  # Allow all origins (or restrict to OpenAI if needed)
 # Ensure all requests contain the correct User-Agent
 @app.before_request
 def before_request():
-    """Ensure all incoming requests contain the correct User-Agent."""
+    """Ensure all incoming requests contain the correct User-Agent and log request details."""
     allowed_user_agent = "Lars Wallin lars.e.wallin@gmail.com"
     
     user_agent = request.headers.get("User-Agent")
+    
+    print(f"DEBUG: Incoming request - User-Agent: {user_agent}")
+    
     if not user_agent or user_agent != allowed_user_agent:
+        print("DEBUG: 403 Forbidden - Missing or incorrect User-Agent.")
         return jsonify({"error": "Missing or incorrect User-Agent."}), 403
 
 # Function to load JSON safely
