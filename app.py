@@ -71,18 +71,23 @@ def get_financials():
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
     urls = filings.get("primaryDocument", [])
+    accession_numbers = filings.get("accessionNumber", [])
     dates = filings.get("filingDate", [])
 
     # Find the latest 10-K or 10-Q
     latest_filing = None
     for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
-            filing_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{urls[i]}"
+            # Construct SEC URL correctly
+            folder_name = accession_numbers[i].replace("-", "")  # Remove dashes from accessionNumber
+            base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
+            filing_main_url = f"{base_url}/{urls[i]}"  # Main document
+
             latest_filing = {
                 "formType": form,
                 "filingDate": dates[i],
-                "filingUrl": filing_url,
-                "summary": extract_summary(filing_url)  # Fetch financial summary
+                "filingUrl": filing_main_url,
+                "summary": extract_summary(filing_main_url)
             }
             break
 
