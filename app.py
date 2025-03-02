@@ -104,10 +104,8 @@ def get_financials():
         "latest_filing": latest_filing
     })
 
-from lxml import etree
-
 def find_xbrl_url(index_url):
-    """Fetches SEC index.json and finds the XBRL file."""
+    """Fetches SEC index.json and finds the correct XBRL financial file."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
     response = requests.get(index_url, headers=headers)
 
@@ -117,8 +115,10 @@ def find_xbrl_url(index_url):
     try:
         index_data = response.json()
         for file in index_data["directory"]["item"]:
+            # Ignore FilingSummary.xml and instead get financial statements
             if file["name"].endswith(".xml") or file["name"].endswith(".xbrl"):
-                return f"{index_url.rsplit('/', 1)[0]}/{file['name']}"  # Construct full XBRL file URL
+                if "cal" in file["name"].lower() or "def" in file["name"].lower() or "pre" in file["name"].lower():
+                    return f"{index_url.rsplit('/', 1)[0]}/{file['name']}"  # Construct full XBRL file URL
     except Exception as e:
         print(f"Error parsing index.json: {e}")
 
