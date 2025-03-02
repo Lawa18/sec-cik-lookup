@@ -11,14 +11,15 @@ CORS(app, origins=["*"])  # Allow all origins (or restrict to OpenAI if needed)
 # Ensure all requests contain the correct User-Agent
 @app.before_request
 def before_request():
-    """Ensure all incoming requests contain the correct User-Agent and log request details."""
+    """Ensure all incoming requests contain the correct User-Agent, but allow GPT fallback."""
     allowed_user_agent = "Lars Wallin lars.e.wallin@gmail.com"
+    gpt_allowed_user_agent = "OpenAI-GPT"  # This is a placeholder, check logs for real GPT user-agent
     
     user_agent = request.headers.get("User-Agent")
-    
+
     print(f"DEBUG: Incoming request - User-Agent: {user_agent}")
-    
-    if not user_agent or user_agent != allowed_user_agent:
+
+    if not user_agent or (user_agent != allowed_user_agent and user_agent != gpt_allowed_user_agent):
         print("DEBUG: 403 Forbidden - Missing or incorrect User-Agent.")
         return jsonify({"error": "Missing or incorrect User-Agent."}), 403
 
