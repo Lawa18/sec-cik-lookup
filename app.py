@@ -124,6 +124,8 @@ def find_xbrl_url(index_url):
 
     return None
 
+from lxml import etree
+
 def extract_summary(xbrl_url):
     """Extracts key financial data from XBRL SEC filings."""
     if not xbrl_url:
@@ -133,30 +135,47 @@ def extract_summary(xbrl_url):
     response = requests.get(xbrl_url, headers=headers)
 
     if response.status_code != 200:
-        return "Error fetching XBRL report."
+        return f"Error fetching XBRL report. Status: {response.status_code}"
 
-    # Parse XBRL using lxml
-    parser = etree.XMLParser(recover=True)
-    tree = etree.fromstring(response.content, parser=parser)
+    try:
+        # Parse XBRL using lxml
+        parser = etree.XMLParser(recover=True)
+        tree = etree.fromstring(response.content, parser=parser)
 
-    # Extract key financial metrics
-    financial_summary = {
-        "Revenue": extract_xbrl_value(tree, "us-gaap:Revenues"),
-        "NetIncome": extract_xbrl_value(tree, "us-gaap:NetIncomeLoss"),
-        "TotalAssets": extract_xbrl_value(tree, "us-gaap:Assets"),
-        "TotalLiabilities": extract_xbrl_value(tree, "us-gaap:Liabilities"),
-        "OperatingCashFlow": extract_xbrl_value(tree, "us-gaap:NetCashProvidedByUsedInOperatingActivities"),
-        "CurrentAssets": extract_xbrl_value(tree, "us-gaap:AssetsCurrent"),
-        "CurrentLiabilities": extract_xbrl_value(tree, "us-gaap:LiabilitiesCurrent"),
-        "Debt": extract_xbrl_value(tree, "us-gaap:LongTermDebtNoncurrent")
-    }
+        # Extract all namespace mappings dynamically
+        namespaces = {k: v for k, v in tree.nsmap.items() if k}
 
-    return financial_summary
+        # Print namespace mappings for debugging
+        print(f"DEBUG: Namespaces detected: {namespaces}")
 
-def extract_xbrl_value(tree, tag):
-    """Extracts the value of a specific XBRL financial tag."""
-    value = tree.xpath(f"//{tag}/text()")
-    return value[0] if value else "N/A"
+        # Extract key financial metrics using namespaces
+        financial_summary = {
+            "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
+            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
+            "TotalAssets": extract_xbrl_value(tree, "Assets", namespaces),
+            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", namespaces),
+            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", namespaces),
+            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", namespaces),
+            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
+            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
+        }
+
+        print(f"DEBUG: Extracted financials: {financial_summary}")
+
+        return financial_summary
+
+    except Exception as e:
+        print(f"ERROR: Parsing error in extract_summary(): {e}")
+        return "Error extracting financial data."
+
+def extract_xbrl_value(tree, tag, namespaces):
+    """Extracts the value of a specific XBRL financial tag, handling namespaces dynamically."""
+    try:
+        value = tree.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        return value[0] if value else "N/A"
+    except Exception as e:
+        print(f"ERROR: Could not extract {tag}: {e}")
+        return "N/A"
 
     # Limit response size to avoid performance issues
     return response.text[:5000]  
