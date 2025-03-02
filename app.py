@@ -2,10 +2,21 @@ import requests
 from flask import Flask, request, jsonify
 import json
 from flask_cors import CORS
+from lxml import etree
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests (for OpenAI integration)
+CORS(app, origins=["*"])  # Allow all origins (or restrict to OpenAI if needed)
+
+# Ensure all requests contain the correct User-Agent
+@app.before_request
+def before_request():
+    """Ensure all incoming requests contain the correct User-Agent."""
+    allowed_user_agent = "Lars Wallin lars.e.wallin@gmail.com"
+    
+    user_agent = request.headers.get("User-Agent")
+    if not user_agent or user_agent != allowed_user_agent:
+        return jsonify({"error": "Missing or incorrect User-Agent."}), 403
 
 # Function to load JSON safely
 def load_json(filename):
@@ -17,11 +28,11 @@ def load_json(filename):
             cik_by_ticker = {}
             cik_by_company = {}
 
-            for key, item in data.items():  # Loop through indexed dictionary
+            for key, item in data.items():
                 if not isinstance(item, dict) or "cik_str" not in item or "ticker" not in item or "title" not in item:
-                    continue  # Skip invalid entries
+                    continue  
 
-                cik_str = str(item["cik_str"]).zfill(10)  # Convert CIK to string with leading zeros
+                cik_str = str(item["cik_str"]).zfill(10)  
                 cik_by_ticker[item["ticker"].lower()] = cik_str
                 cik_by_company[item["title"].lower()] = cik_str
 
@@ -80,8 +91,8 @@ def get_financials():
         if form in ["10-K", "10-Q"]:
             folder_name = accession_numbers[i].replace("-", "")
             base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
-            filing_main_url = f"{base_url}/{urls[i]}"  # Main filing document
-            filing_index_url = f"{base_url}/index.json"  # JSON index of all documents in the filing
+            filing_main_url = f"{base_url}/{urls[i]}"
+            filing_index_url = f"{base_url}/index.json"
 
             # Fetch filing index to find the XBRL file
             xbrl_url = find_xbrl_url(filing_index_url)
@@ -104,8 +115,6 @@ def get_financials():
         "latest_filing": latest_filing
     })
 
-from lxml import etree
-
 def find_xbrl_url(index_url):
     """Fetches SEC index.json and finds the correct XBRL file for financial data."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
@@ -119,7 +128,6 @@ def find_xbrl_url(index_url):
         xbrl_file = None
 
         for file in index_data["directory"]["item"]:
-            # Look for main financial statement XBRL (avoid _cal.xml, _lab.xml, etc.)
             if file["name"].endswith("_htm.xml") or file["name"].endswith("_full.xml"):
                 xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
                 break
@@ -130,8 +138,6 @@ def find_xbrl_url(index_url):
     except Exception as e:
         print(f"ERROR: Could not parse SEC index.json: {e}")
         return None
-
-from lxml import etree
 
 def extract_summary(xbrl_url):
     """Extracts key financial data from the correct XBRL SEC filing."""
@@ -145,16 +151,12 @@ def extract_summary(xbrl_url):
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
     try:
-        # Parse XBRL file using lxml
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        # Extract namespaces
         namespaces = {k: v for k, v in tree.nsmap.items() if k}
-
         print(f"DEBUG: Namespaces detected: {namespaces}")
 
-        # Extract financial metrics using namespaces
         financial_summary = {
             "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
             "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
@@ -167,7 +169,6 @@ def extract_summary(xbrl_url):
         }
 
         print(f"DEBUG: Extracted financials: {financial_summary}")
-
         return financial_summary
 
     except Exception as e:
@@ -182,9 +183,6 @@ def extract_xbrl_value(tree, tag, namespaces):
     except Exception as e:
         print(f"ERROR: Could not extract {tag}: {e}")
         return "N/A"
-
-    # Limit response size to avoid performance issues
-    return response.text[:5000]  
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
