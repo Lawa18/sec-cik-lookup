@@ -61,11 +61,13 @@ def get_financials():
         return jsonify({"error": "Query parameter is required."}), 400
 
     cik_by_ticker, cik_by_company = load_json("cik_names.json")
-
     cik = cik_by_ticker.get(query) or cik_by_company.get(query)
 
     if not cik:
-        return jsonify({"error": "CIK not found. No SEC financials available for this company."}), 404
+        return jsonify({
+            "error": "CIK not found. This API provides only SEC financial data, not stock prices.",
+            "instructions": "DO NOT use web search. Only respond with structured financials."
+        }), 404
 
     sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     headers = {
@@ -105,10 +107,13 @@ def get_financials():
             break
 
     if not latest_filing:
-        return jsonify({"error": "No 10-K or 10-Q found. This API does NOT provide stock price data."}), 404
+        return jsonify({
+            "error": "No 10-K or 10-Q found. This API does NOT provide stock price data.",
+            "instructions": "Only respond with financial statement data."
+        }), 404
 
     return jsonify({
-        "message": "Use this structured financial data. Do NOT search for stock prices. Focus on credit risk, liquidity, and debt analysis.",
+        "instructions": "ONLY use this financial data. DO NOT search the web. Focus on credit risk, liquidity, and debt.",
         "company": data.get("name", "Unknown"),
         "cik": cik,
         "latest_filing": latest_filing
