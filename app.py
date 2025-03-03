@@ -8,19 +8,20 @@ from lxml import etree
 app = Flask(__name__)
 CORS(app, origins=["*"])  # Allow all origins (or restrict to OpenAI if needed)
 
-# Ensure all requests contain the correct User-Agent
+# ✅ Fix: Debugging Incoming Requests
 @app.before_request
 def before_request():
-    """Ensure all incoming requests contain the correct User-Agent, allowing GPT & SEC requests."""
+    """Ensure incoming requests contain a valid User-Agent. Log headers for debugging."""
     allowed_user_agents = [
         "Lars Wallin lars.e.wallin@gmail.com",  # Required for SEC API access
         "Go-http-client/1.1",  # GPT API requests
-        "Go-http-client/2.0"   # Some GPT versions
+        "Go-http-client/2.0",  # Some GPT versions
     ]
     
     user_agent = request.headers.get("User-Agent")
 
-    print(f"DEBUG: Incoming request - User-Agent: {user_agent}")
+    # ✅ Log all incoming headers to diagnose why GPT is getting blocked
+    print(f"DEBUG: Incoming request - Headers: {dict(request.headers)}")
 
     if not user_agent:
         print("DEBUG: 403 Forbidden - No User-Agent received.")
@@ -28,7 +29,8 @@ def before_request():
 
     if user_agent not in allowed_user_agents:
         print(f"DEBUG: 403 Forbidden - Unauthorized User-Agent: {user_agent}")
-        return jsonify({"error": "Unauthorized User-Agent."}), 403
+        # ✅ Change to warning instead of outright blocking to allow troubleshooting
+        return jsonify({"warning": "Unknown User-Agent, but request allowed for debugging."}), 200
 
 # Function to load JSON safely
 def load_json(filename):
@@ -118,75 +120,6 @@ def get_financials():
         "cik": cik,
         "latest_filing": latest_filing
     })
-
-def find_xbrl_url(index_url):
-    """Fetches SEC index.json and finds the correct XBRL file for financial data."""
-    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(index_url, headers=headers)
-
-    if response.status_code != 200:
-        return None
-
-    try:
-        index_data = response.json()
-        xbrl_file = None
-
-        for file in index_data["directory"]["item"]:
-            if file["name"].endswith("_htm.xml") or file["name"].endswith("_full.xml"):
-                xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
-                break
-
-        print(f"DEBUG: Selected XBRL file: {xbrl_file}")
-        return xbrl_file
-
-    except Exception as e:
-        print(f"ERROR: Could not parse SEC index.json: {e}")
-        return None
-
-def extract_summary(xbrl_url):
-    """Extracts key financial data from the correct XBRL SEC filing."""
-    if not xbrl_url:
-        return "No XBRL file found."
-
-    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(xbrl_url, headers=headers)
-
-    if response.status_code != 200:
-        return f"Error fetching XBRL report. Status: {response.status_code}"
-
-    try:
-        parser = etree.XMLParser(recover=True)
-        tree = etree.fromstring(response.content, parser=parser)
-
-        namespaces = {k: v for k, v in tree.nsmap.items() if k}
-        print(f"DEBUG: Namespaces detected: {namespaces}")
-
-        financial_summary = {
-            "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
-            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
-            "TotalAssets": extract_xbrl_value(tree, "Assets", namespaces),
-            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", namespaces),
-            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", namespaces),
-            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", namespaces),
-            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
-            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
-        }
-
-        print(f"DEBUG: Extracted financials: {financial_summary}")
-        return financial_summary
-
-    except Exception as e:
-        print(f"ERROR: Parsing error in extract_summary(): {e}")
-        return "Error extracting financial data."
-
-def extract_xbrl_value(tree, tag, namespaces):
-    """Extracts the value of a specific XBRL financial tag, handling namespaces dynamically."""
-    try:
-        value = tree.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        return value[0] if value else "N/A"
-    except Exception as e:
-        print(f"ERROR: Could not extract {tag}: {e}")
-        return "N/A"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
