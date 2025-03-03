@@ -56,44 +56,31 @@ def get_financials():
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
 
-    # Load the CIK database
     cik_by_ticker, cik_by_company = load_json("cik_names.json")
 
-    # Exact match lookup
     cik = cik_by_ticker.get(query) or cik_by_company.get(query)
 
-    # Partial match (if no exact match)
     if not cik:
-        for name, cik_value in cik_by_company.items():
-            if query in name:
-                cik = cik_value
-                break
+        return jsonify({"error": "CIK not found. No SEC financials available for this company."}), 404
 
-    if not cik:
-        return jsonify({"error": "CIK not found."}), 404
-
-    # Fetch latest SEC filings
     sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     headers = {
         "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",
         "Accept": "application/json"
     }
-    
+
     sec_response = requests.get(sec_url, headers=headers)
 
     if sec_response.status_code != 200:
         return jsonify({"error": "Failed to fetch SEC data.", "status": sec_response.status_code}), sec_response.status_code
 
     data = sec_response.json()
-
-    # Extract the latest 10-K or 10-Q filing
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
     urls = filings.get("primaryDocument", [])
     accession_numbers = filings.get("accessionNumber", [])
     dates = filings.get("filingDate", [])
 
-    # Find the latest 10-K or 10-Q
     latest_filing = None
     for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
@@ -102,7 +89,6 @@ def get_financials():
             filing_main_url = f"{base_url}/{urls[i]}"
             filing_index_url = f"{base_url}/index.json"
 
-            # Fetch filing index to find the XBRL file
             xbrl_url = find_xbrl_url(filing_index_url)
 
             latest_filing = {
@@ -115,9 +101,10 @@ def get_financials():
             break
 
     if not latest_filing:
-        return jsonify({"error": "No 10-K or 10-Q found."}), 404
+        return jsonify({"error": "No 10-K or 10-Q found. This API does NOT provide stock price data."}), 404
 
     return jsonify({
+        "message": "Use this structured financial data. Do NOT search for stock prices. Focus on credit risk, liquidity, and debt analysis.",
         "company": data.get("name", "Unknown"),
         "cik": cik,
         "latest_filing": latest_filing
