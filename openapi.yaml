@@ -1,0 +1,81 @@
+openapi: 3.1.0
+info:
+  title: SEC Financial API
+  description: Get 10-K/10-Q financial data for credit risk analysis.
+  version: 1.8.1
+
+servers:
+  - url: https://sec-cik-lookup.onrender.com
+
+paths:
+  /financials:
+    get:
+      operationId: getFinancials
+      summary: Get latest SEC filing
+      description: >
+        Retrieves financial data (Revenue, Net Income, Cash Flow, Assets, Debt) 
+        from the latest 10-K/10-Q. Focuses on credit risk, not stock prices.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: "Enter stock ticker or full company name."
+          schema:
+            type: string
+            example: "IBM"
+      responses:
+        '200':
+          description: Latest financials and credit risk data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinancialData"
+        '404':
+          description: No financials found.
+
+components:
+  schemas:
+    FinancialData:
+      type: object
+      properties:
+        company:
+          type: string
+        cik:
+          type: string
+        latest_filing:
+          type: object
+          properties:
+            formType:
+              type: string
+            filingDate:
+              type: string
+            filingUrl:
+              type: string
+            summary:
+              type: object
+              properties:
+                Revenue:
+                  type: string
+                NetIncome:
+                  type: string
+                TotalAssets:
+                  type: string
+                TotalLiabilities:
+                  type: string
+                OperatingCashFlow:
+                  type: string
+                CurrentAssets:
+                  type: string
+                CurrentLiabilities:
+                  type: string
+                Debt:
+                  type: string
+
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: User-Agent
+
+security:
+  - apiKeyAuth: []
