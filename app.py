@@ -9,36 +9,27 @@ from lxml import etree  # Make sure this is at the top
 app = Flask(__name__)
 CORS(app, origins=["*"])  # Allow all origins (or restrict to OpenAI if needed)
 
+# Ensure all requests contain the correct User-Agent
 @app.before_request
 def before_request():
-    """Ensure incoming requests contain a valid User-Agent, allowing GPT & SEC requests."""
+    """Ensure all incoming requests contain the correct User-Agent, allowing GPT & SEC requests."""
     allowed_user_agents = [
         "Lars Wallin lars.e.wallin@gmail.com",  # Required for SEC API access
         "Go-http-client/1.1",  # GPT API requests
-        "Go-http-client/2.0"   # Some GPT versions
+        "Go-http-client/2.0",  # Some GPT versions
+        "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"  # OpenAI GPT
     ]
     
     user_agent = request.headers.get("User-Agent")
-    
-    # ✅ Log ALL incoming requests
-    print(f"DEBUG: Incoming request - Headers: {dict(request.headers)}")
-    
-    # ✅ Redirect invalid root requests to /financials
-    if request.path == "/":
-        print("DEBUG: Redirecting root request to /financials?query=example")
-        return jsonify({
-            "error": "Invalid request. Use /financials?query=IBM for financial data."
-        }), 400
-    
-    # ✅ Allow all Go-http-client requests, even if unknown
+
+    print(f"DEBUG: Incoming request - User-Agent: {user_agent}")
+
     if not user_agent:
         print("DEBUG: 403 Forbidden - No User-Agent received.")
         return jsonify({"error": "Missing User-Agent."}), 403
 
     if user_agent not in allowed_user_agents:
-        print(f"DEBUG: Warning - Unknown User-Agent: {user_agent}, but allowing request.")
-    
-    return  # ✅ Do not block requests, even if the User-Agent is missing
+        print(f"DEBUG: 403 Warning - Unknown User-Agent: {user_agent}, but allowing request.")
 
 # Function to load JSON safely
 def load_json(filename):
