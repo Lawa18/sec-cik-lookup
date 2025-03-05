@@ -28,8 +28,10 @@ def before_request():
         print("DEBUG: 403 Forbidden - No User-Agent received.")
         return jsonify({"error": "Missing User-Agent."}), 403
 
-    if user_agent not in allowed_user_agents:
-        print(f"DEBUG: 403 Warning - Unknown User-Agent: {user_agent}, but allowing request.")
+    if user_agent in allowed_user_agents:
+        print(f"DEBUG: ✅ Allowed request from User-Agent: {user_agent}")
+    else:
+        print(f"DEBUG: ⚠️ Unknown User-Agent: {user_agent}, but allowing request.")
 
 # Function to load JSON safely
 def load_json(filename):
