@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import json
 from flask_cors import CORS
 from lxml import etree
+from lxml import etree  # Make sure this is at the top
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -86,6 +87,51 @@ def find_xbrl_url(index_url):
     except Exception as e:
         print(f"ERROR: Could not parse SEC index.json: {e}")
         return None
+
+def extract_summary(xbrl_url):
+    """Extracts key financial data from the XBRL SEC filing."""
+    if not xbrl_url:
+        return "No XBRL file found."
+
+    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+    response = requests.get(xbrl_url, headers=headers)
+
+    if response.status_code != 200:
+        return f"Error fetching XBRL report. Status: {response.status_code}"
+
+    try:
+        parser = etree.XMLParser(recover=True)
+        tree = etree.fromstring(response.content, parser=parser)
+
+        namespaces = {k: v for k, v in tree.nsmap.items() if k}
+        print(f"DEBUG: Namespaces detected: {namespaces}")
+
+        financial_summary = {
+            "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
+            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
+            "TotalAssets": extract_xbrl_value(tree, "Assets", namespaces),
+            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", namespaces),
+            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", namespaces),
+            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", namespaces),
+            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
+            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
+        }
+
+        print(f"DEBUG: Extracted financials: {financial_summary}")
+        return financial_summary
+
+    except Exception as e:
+        print(f"ERROR: Parsing error in extract_summary(): {e}")
+        return "Error extracting financial data."
+
+def extract_xbrl_value(tree, tag, namespaces):
+    """Extracts the value of a specific XBRL financial tag, handling namespaces dynamically."""
+    try:
+        value = tree.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        return value[0] if value else "N/A"
+    except Exception as e:
+        print(f"ERROR: Could not extract {tag}: {e}")
+        return "N/A"
 
 @app.route("/financials", methods=["GET"])
 def get_financials():
