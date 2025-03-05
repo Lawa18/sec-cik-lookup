@@ -125,6 +125,14 @@ def extract_xbrl_value(tree, tag, namespaces):
     except Exception as e:
         print(f"ERROR: Could not extract {tag}: {e}")
         return "N/A"
+        
+@app.route("/", methods=["GET"])
+def home():
+    """Handles root requests and directs users to the correct endpoint."""
+    return jsonify({
+        "message": "SEC Financial API is running. Use /financials?query=<ticker> for financial data.",
+        "example": "https://sec-cik-lookup.onrender.com/financials?query=IBM"
+    }), 200
 
 @app.route("/financials", methods=["GET"])
 def get_financials():
