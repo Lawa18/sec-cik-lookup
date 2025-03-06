@@ -22,7 +22,7 @@ def before_request():
     
     user_agent = request.headers.get("User-Agent")
 
-    print(f"DEBUG: Incoming request - User-Agent: {user_agent}")
+    print(f"DEBUG: Incoming request - Headers: {dict(request.headers)}")
 
     if not user_agent:
         print("DEBUG: 403 Forbidden - No User-Agent received.")
