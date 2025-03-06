@@ -3,7 +3,6 @@ from flask import Flask, request, jsonify
 import json
 from flask_cors import CORS
 from lxml import etree
-from lxml import etree  # Make sure this is at the top
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -17,7 +16,7 @@ def before_request():
         "Lars Wallin lars.e.wallin@gmail.com",  # Required for SEC API access
         "Go-http-client/1.1",  # GPT API requests
         "Go-http-client/2.0",  # Some GPT versions
-        "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"  # OpenAI GPT
+        "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"
     ]
     
     user_agent = request.headers.get("User-Agent")
@@ -69,7 +68,6 @@ def find_xbrl_url(index_url):
         xbrl_file = None
 
         for file in index_data["directory"]["item"]:
-            # Look for main financial statement XBRL (avoid _cal.xml, _lab.xml, etc.)
             if file["name"].endswith("_htm.xml") or file["name"].endswith("_full.xml"):
                 xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
                 break
@@ -145,10 +143,7 @@ def get_financials():
     cik = cik_by_ticker.get(query) or cik_by_company.get(query)
 
     if not cik:
-        return jsonify({
-            "error": "CIK not found. This API provides only SEC financial data, not stock prices.",
-            "instructions": "DO NOT use web search. Only respond with structured financials."
-        }), 404
+        return jsonify({"error": "CIK not found. This API provides only SEC financial data."}), 404
 
     sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
     headers = {
@@ -162,42 +157,19 @@ def get_financials():
         return jsonify({"error": "Failed to fetch SEC data.", "status": sec_response.status_code}), sec_response.status_code
 
     data = sec_response.json()
-    filings = data.get("filings", {}).get("recent", {})
-    forms = filings.get("form", [])
-    urls = filings.get("primaryDocument", [])
-    accession_numbers = filings.get("accessionNumber", [])
-    dates = filings.get("filingDate", [])
+    latest_filing = data.get("filings", {}).get("recent", {}).get("filing", [{}])[0]  # Get latest filing
 
-    latest_filing = None
-    for i, form in enumerate(forms):
-        if form in ["10-K", "10-Q"]:
-            folder_name = accession_numbers[i].replace("-", "")
-            base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
-            filing_main_url = f"{base_url}/{urls[i]}"
-            filing_index_url = f"{base_url}/index.json"
-
-            xbrl_url = find_xbrl_url(filing_index_url)
-
-            latest_filing = {
-                "formType": form,
-                "filingDate": dates[i],
-                "filingUrl": filing_main_url,
-                "xbrlUrl": xbrl_url,
-                "summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
-            }
-            break
-
-    if not latest_filing:
-        return jsonify({
-            "error": "No 10-K or 10-Q found. This API does NOT provide stock price data.",
-            "instructions": "Only respond with financial statement data."
-        }), 404
+    filing_summary = {
+        "formType": latest_filing.get("formType", "N/A"),
+        "filingDate": latest_filing.get("filingDate", "N/A"),
+        "filingUrl": latest_filing.get("filingUrl", "N/A"),
+        "summary": latest_filing.get("summary", {})  # ✅ Ensures no KeyError
+    }
 
     return jsonify({
-        "instructions": "ONLY use this financial data. DO NOT search the web. Focus on credit risk, liquidity, and debt.",
         "company": data.get("name", "Unknown"),
         "cik": cik,
-        "latest_filing": latest_filing
+        "latest_filing": filing_summary
     })
 
 if __name__ == "__main__":
