@@ -45,6 +45,34 @@ def fetch_sec_data(cik):
 
     return sec_response.json()
 
+def find_xbrl_url(index_url):
+    """Fetches SEC index.json and finds the correct XBRL file for financial data."""
+    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+    response = requests.get(index_url, headers=headers)
+
+    if response.status_code != 200:
+        print(f"ERROR: Failed to fetch index.json. Status: {response.status_code}")
+        return None
+
+    try:
+        index_data = response.json()
+        xbrl_file = None
+
+        # ✅ Look for structured XBRL files, avoiding summary & schemas
+        for file in index_data["directory"]["item"]:
+            name = file["name"].lower()
+
+            if name.endswith(".xml") and not name.endswith(("summary.xml", ".xsd")):
+                xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
+                break  # ✅ Select the first valid file
+
+        print(f"DEBUG: Selected XBRL file: {xbrl_file}")
+        return xbrl_file
+
+    except Exception as e:
+        print(f"ERROR: Could not parse SEC index.json: {e}")
+        return None
+
 def extract_summary(xbrl_url):
     """Extracts financial data from the XBRL SEC filing with improved error handling."""
     if not xbrl_url:
