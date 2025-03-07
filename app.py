@@ -148,14 +148,19 @@ def get_financials():
     latest_filing = None
     for i, form in enumerate(filings.get("form", [])):
         if form in ["10-K", "10-Q"]:
+            accession_number = filings.get("accessionNumber", [None])[i]
+            if not accession_number:
+                return jsonify({"error": "Accession number not found."}), 500
+
+            index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
+            xbrl_url = find_xbrl_url(index_url)
+
             latest_filing = {
                 "formType": form,
                 "filingDate": filings.get("filingDate", ["N/A"])[i],
-                "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{filings.get('accessionNumber', [''])[i].replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
-                index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{filings.get('accessionNumber', [''])[i].replace('-', '')}/index.json"
-xbrl_url = find_xbrl_url(index_url)
-"summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
-
+                "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
+                "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
+                "summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
             }
             break
 
