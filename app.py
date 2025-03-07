@@ -157,7 +157,39 @@ def get_financials():
         return jsonify({"error": "Failed to fetch SEC data.", "status": sec_response.status_code}), sec_response.status_code
 
     data = sec_response.json()
-    latest_filing = data.get("filings", {}).get("recent", {}).get("filing", [{}])[0]  # Get latest filing
+    filings = data.get("filings", {}).get("recent", {})
+forms = filings.get("form", [])
+urls = filings.get("primaryDocument", [])
+accession_numbers = filings.get("accessionNumber", [])
+dates = filings.get("filingDate", [])
+
+latest_filing = None
+for i, form in enumerate(forms):
+    if form in ["10-K", "10-Q"]:  # Only take the latest 10-K or 10-Q
+        folder_name = accession_numbers[i].replace("-", "")
+        base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
+        filing_main_url = f"{base_url}/{urls[i]}"
+        filing_index_url = f"{base_url}/index.json"
+
+        xbrl_url = find_xbrl_url(filing_index_url)
+
+        latest_filing = {
+            "formType": form,
+            "filingDate": dates[i],
+            "filingUrl": filing_main_url,
+            "xbrlUrl": xbrl_url,
+            "summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
+        }
+        break  # Stop at the first 10-K or 10-Q found
+
+if not latest_filing:
+    return jsonify({"error": "No 10-K or 10-Q found for this company."}), 404
+
+return jsonify({
+    "company": data.get("name", "Unknown"),
+    "cik": cik,
+    "latest_filing": latest_filing
+})
 
     filing_summary = {
         "formType": latest_filing.get("formType", "N/A"),
