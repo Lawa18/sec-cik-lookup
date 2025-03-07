@@ -20,7 +20,6 @@ def before_request():
     ]
     
     user_agent = request.headers.get("User-Agent")
-
     print(f"DEBUG: Incoming request - Headers: {dict(request.headers)}")
 
     if not user_agent:
@@ -54,7 +53,7 @@ def load_json(filename):
 
     except (FileNotFoundError, json.JSONDecodeError):
         return {}, {}
-        
+
 def find_xbrl_url(index_url):
     """Fetches SEC index.json and finds the correct XBRL file for financial data."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
@@ -65,16 +64,9 @@ def find_xbrl_url(index_url):
 
     try:
         index_data = response.json()
-        xbrl_file = None
-
         for file in index_data["directory"]["item"]:
             if file["name"].endswith("_htm.xml") or file["name"].endswith("_full.xml"):
-                xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
-                break
-
-        print(f"DEBUG: Selected XBRL file: {xbrl_file}")
-        return xbrl_file
-
+                return f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
     except Exception as e:
         print(f"ERROR: Could not parse SEC index.json: {e}")
         return None
@@ -82,48 +74,44 @@ def find_xbrl_url(index_url):
 def extract_summary(xbrl_url):
     """Extracts key financial data from the XBRL SEC filing."""
     if not xbrl_url:
-        return "No XBRL file found."
+        return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
     response = requests.get(xbrl_url, headers=headers)
 
     if response.status_code != 200:
-        return f"Error fetching XBRL report. Status: {response.status_code}"
+        return {}
 
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        namespaces = {k: v for k, v in tree.nsmap.items() if k}
-        print(f"DEBUG: Namespaces detected: {namespaces}")
-
         financial_summary = {
-            "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
-            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
-            "TotalAssets": extract_xbrl_value(tree, "Assets", namespaces),
-            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", namespaces),
-            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", namespaces),
-            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", namespaces),
-            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
-            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
+            "Revenue": extract_xbrl_value(tree, "Revenues"),
+            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss"),
+            "TotalAssets": extract_xbrl_value(tree, "Assets"),
+            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities"),
+            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities"),
+            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent"),
+            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent"),
+            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent"),
         }
 
-        print(f"DEBUG: Extracted financials: {financial_summary}")
         return financial_summary
 
     except Exception as e:
         print(f"ERROR: Parsing error in extract_summary(): {e}")
-        return "Error extracting financial data."
+        return {}
 
-def extract_xbrl_value(tree, tag, namespaces):
-    """Extracts the value of a specific XBRL financial tag, handling namespaces dynamically."""
+def extract_xbrl_value(tree, tag):
+    """Extracts the value of a specific XBRL financial tag."""
     try:
-        value = tree.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        value = tree.xpath(f"//*[local-name()='{tag}']/text()")
         return value[0] if value else "N/A"
     except Exception as e:
         print(f"ERROR: Could not extract {tag}: {e}")
         return "N/A"
-        
+
 @app.route("/", methods=["GET"])
 def home():
     """Handles root requests and directs users to the correct endpoint."""
@@ -158,50 +146,37 @@ def get_financials():
 
     data = sec_response.json()
     filings = data.get("filings", {}).get("recent", {})
-forms = filings.get("form", [])
-urls = filings.get("primaryDocument", [])
-accession_numbers = filings.get("accessionNumber", [])
-dates = filings.get("filingDate", [])
+    forms = filings.get("form", [])
+    urls = filings.get("primaryDocument", [])
+    accession_numbers = filings.get("accessionNumber", [])
+    dates = filings.get("filingDate", [])
 
-latest_filing = None
-for i, form in enumerate(forms):
-    if form in ["10-K", "10-Q"]:  # Only take the latest 10-K or 10-Q
-        folder_name = accession_numbers[i].replace("-", "")
-        base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
-        filing_main_url = f"{base_url}/{urls[i]}"
-        filing_index_url = f"{base_url}/index.json"
+    latest_filing = None
+    for i, form in enumerate(forms):
+        if form in ["10-K", "10-Q"]:
+            folder_name = accession_numbers[i].replace("-", "")
+            base_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{folder_name}"
+            filing_main_url = f"{base_url}/{urls[i]}"
+            filing_index_url = f"{base_url}/index.json"
 
-        xbrl_url = find_xbrl_url(filing_index_url)
+            xbrl_url = find_xbrl_url(filing_index_url)
 
-        latest_filing = {
-            "formType": form,
-            "filingDate": dates[i],
-            "filingUrl": filing_main_url,
-            "xbrlUrl": xbrl_url,
-            "summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
-        }
-        break  # Stop at the first 10-K or 10-Q found
+            latest_filing = {
+                "formType": form,
+                "filingDate": dates[i],
+                "filingUrl": filing_main_url,
+                "xbrlUrl": xbrl_url,
+                "summary": extract_summary(xbrl_url) if xbrl_url else {}
+            }
+            break
 
-if not latest_filing:
-    return jsonify({"error": "No 10-K or 10-Q found for this company."}), 404
-
-return jsonify({
-    "company": data.get("name", "Unknown"),
-    "cik": cik,
-    "latest_filing": latest_filing
-})
-
-    filing_summary = {
-        "formType": latest_filing.get("formType", "N/A"),
-        "filingDate": latest_filing.get("filingDate", "N/A"),
-        "filingUrl": latest_filing.get("filingUrl", "N/A"),
-        "summary": latest_filing.get("summary", {})  # ✅ Ensures no KeyError
-    }
+    if not latest_filing:
+        return jsonify({"error": "No 10-K or 10-Q found for this company."}), 404
 
     return jsonify({
         "company": data.get("name", "Unknown"),
         "cik": cik,
-        "latest_filing": filing_summary
+        "latest_filing": latest_filing
     })
 
 if __name__ == "__main__":
