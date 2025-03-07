@@ -56,21 +56,20 @@ def extract_summary(xbrl_url):
     if response.status_code != 200:
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
-    # 🛑 **Check if response content is empty**
-    if not response.content.strip():
-        return "Error: XBRL file is empty or inaccessible."
+    # 🛑 Print the first 1000 characters for debugging
+    print("DEBUG: First 1000 characters of XBRL file:\n", response.text[:1000])
 
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        # 🛑 **Check if tree is None**
+        # 🛑 Check if tree is None
         if tree is None or not hasattr(tree, "nsmap"):
             return "Error: Could not parse XBRL file. Possible format issue."
 
-        # Extract namespaces
-        namespaces = {k: v for k, v in tree.nsmap.items() if k}
-        print(f"DEBUG: Namespaces detected: {namespaces}")
+        # Extract **all** namespaces dynamically
+        namespaces = tree.nsmap
+        print("DEBUG: Extracted Namespaces:", namespaces)
 
         financials = {
             "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
