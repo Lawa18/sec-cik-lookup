@@ -46,7 +46,7 @@ def fetch_sec_data(cik):
     return sec_response.json()
 
 def extract_summary(xbrl_url):
-    """Extracts financial data & calculates key ratios."""
+    """Extracts financial data & calculates key ratios with error handling."""
     if not xbrl_url:
         return "No XBRL file found."
 
@@ -56,11 +56,21 @@ def extract_summary(xbrl_url):
     if response.status_code != 200:
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
+    # 🛑 **Check if response content is empty**
+    if not response.content.strip():
+        return "Error: XBRL file is empty."
+
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
+        # 🛑 **Check if tree is None**
+        if tree is None:
+            return "Error: Could not parse XBRL file."
+
+        # Extract namespaces
         namespaces = {k: v for k, v in tree.nsmap.items() if k}
+        print(f"DEBUG: Namespaces detected: {namespaces}")
 
         financials = {
             "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
@@ -73,31 +83,11 @@ def extract_summary(xbrl_url):
             "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
         }
 
-        # Convert values to floats for ratio calculations
-        def to_float(value):
-            try:
-                return float(value)
-            except ValueError:
-                return None
-
-        revenue = to_float(financials["Revenue"])
-        net_income = to_float(financials["NetIncome"])
-        total_assets = to_float(financials["TotalAssets"])
-        total_liabilities = to_float(financials["TotalLiabilities"])
-        operating_cash_flow = to_float(financials["OperatingCashFlow"])
-        current_assets = to_float(financials["CurrentAssets"])
-        current_liabilities = to_float(financials["CurrentLiabilities"])
-        debt = to_float(financials["Debt"])
-
-        # Calculate Key Ratios
-        financials["CurrentRatio"] = round(current_assets / current_liabilities, 2) if current_assets and current_liabilities else "N/A"
-        financials["DebtToEquityRatio"] = round(total_liabilities / total_assets, 2) if total_liabilities and total_assets else "N/A"
-        financials["FreeCashFlow"] = round(operating_cash_flow - net_income, 2) if operating_cash_flow and net_income else "N/A"
-
         return financials
 
     except Exception as e:
-        return f"Error extracting financial data: {e}"
+        print(f"ERROR: Parsing error in extract_summary(): {e}")
+        return f"Error extracting financial data: {str(e)}"
 
 def extract_xbrl_value(tree, tag, namespaces):
     """Extracts a specific financial value from XBRL."""
