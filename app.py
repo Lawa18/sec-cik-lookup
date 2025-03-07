@@ -152,7 +152,10 @@ def get_financials():
                 "formType": form,
                 "filingDate": filings.get("filingDate", ["N/A"])[i],
                 "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{filings.get('accessionNumber', [''])[i].replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
-                "summary": extract_summary(f"https://www.sec.gov/Archives/edgar/data/{cik}/{filings.get('accessionNumber', [''])[i].replace('-', '')}/index.json")
+                index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{filings.get('accessionNumber', [''])[i].replace('-', '')}/index.json"
+xbrl_url = find_xbrl_url(index_url)
+"summary": extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
+
             }
             break
 
