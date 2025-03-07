@@ -46,7 +46,7 @@ def fetch_sec_data(cik):
     return sec_response.json()
 
 def extract_summary(xbrl_url):
-    """Extracts financial data & calculates key ratios with error handling."""
+    """Extracts financial data from the XBRL SEC filing with improved error handling."""
     if not xbrl_url:
         return "No XBRL file found."
 
@@ -58,15 +58,15 @@ def extract_summary(xbrl_url):
 
     # 🛑 **Check if response content is empty**
     if not response.content.strip():
-        return "Error: XBRL file is empty."
+        return "Error: XBRL file is empty or inaccessible."
 
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
         # 🛑 **Check if tree is None**
-        if tree is None:
-            return "Error: Could not parse XBRL file."
+        if tree is None or not hasattr(tree, "nsmap"):
+            return "Error: Could not parse XBRL file. Possible format issue."
 
         # Extract namespaces
         namespaces = {k: v for k, v in tree.nsmap.items() if k}
@@ -85,8 +85,10 @@ def extract_summary(xbrl_url):
 
         return financials
 
+    except etree.XMLSyntaxError:
+        return "Error: XML Syntax Error - File may be corrupted."
+
     except Exception as e:
-        print(f"ERROR: Parsing error in extract_summary(): {e}")
         return f"Error extracting financial data: {str(e)}"
 
 def extract_xbrl_value(tree, tag, namespaces):
