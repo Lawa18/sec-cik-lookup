@@ -134,7 +134,7 @@ def extract_summary(xbrl_url):
         return f"Error extracting financial data: {str(e)}"
 
 def extract_xbrl_value(tree, tag, namespaces):
-    """Extracts a specific financial value from XBRL with correct namespace handling."""
+    """Extracts a specific financial value from XBRL using the correct namespace prefix."""
     try:
         # ✅ Find the correct prefix for 'us-gaap'
         us_gaap_prefix = None
@@ -148,8 +148,8 @@ def extract_xbrl_value(tree, tag, namespaces):
             return "N/A"
 
         # ✅ Construct correct XPath query using `us-gaap` prefix
-        xpath_query = f"//{us_gaap_prefix}:{tag}"
-        value_elements = tree.xpath(xpath_query, namespaces=namespaces)
+        xpath_query = f"//{{{namespaces[us_gaap_prefix]}}}{tag}"
+        value_elements = tree.findall(xpath_query, namespaces)
 
         # ✅ Debugging: Print extracted values
         if value_elements:
