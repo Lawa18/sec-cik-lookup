@@ -79,20 +79,6 @@ def find_xbrl_url(index_url):
         return None
 
 def extract_summary(xbrl_url):
-        print("DEBUG: Checking XBRL content length:", len(response.content))
-        print("DEBUG: First 1000 characters of XBRL file:\n", response.text[:1000])
-
-try:
-    parser = etree.XMLParser(recover=True)
-    tree = etree.fromstring(response.content, parser=parser)
-
-    if tree is None or not hasattr(tree, "nsmap"):
-        print("ERROR: XBRL parsing failed. Tree is None or missing namespaces.")
-        return "Error: Could not parse XBRL file."
-
-    namespaces = tree.nsmap
-    print("DEBUG: Extracted Namespaces:", namespaces)
-
     """Extracts financial data from the XBRL SEC filing with improved error handling."""
     if not xbrl_url:
         return "No XBRL file found."
@@ -103,21 +89,24 @@ try:
     if response.status_code != 200:
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
-    # 🛑 Print the first 1000 characters for debugging
+    # 🛑 Debug Logging: Ensure XBRL file is properly fetched
+    print("DEBUG: Checking XBRL content length:", len(response.content))
     print("DEBUG: First 1000 characters of XBRL file:\n", response.text[:1000])
 
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        # 🛑 Check if tree is None
+        # 🛑 Ensure the XBRL tree parsed correctly
         if tree is None or not hasattr(tree, "nsmap"):
-            return "Error: Could not parse XBRL file. Possible format issue."
+            print("ERROR: XBRL parsing failed. Tree is None or missing namespaces.")
+            return "Error: Could not parse XBRL file."
 
-        # Extract **all** namespaces dynamically
+        # ✅ Extract **all** namespaces dynamically
         namespaces = tree.nsmap
         print("DEBUG: Extracted Namespaces:", namespaces)
 
+        # ✅ Extract Key Financial Data
         financials = {
             "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
             "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
