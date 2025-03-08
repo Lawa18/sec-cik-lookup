@@ -79,6 +79,20 @@ def find_xbrl_url(index_url):
         return None
 
 def extract_summary(xbrl_url):
+        print("DEBUG: Checking XBRL content length:", len(response.content))
+        print("DEBUG: First 1000 characters of XBRL file:\n", response.text[:1000])
+
+try:
+    parser = etree.XMLParser(recover=True)
+    tree = etree.fromstring(response.content, parser=parser)
+
+    if tree is None or not hasattr(tree, "nsmap"):
+        print("ERROR: XBRL parsing failed. Tree is None or missing namespaces.")
+        return "Error: Could not parse XBRL file."
+
+    namespaces = tree.nsmap
+    print("DEBUG: Extracted Namespaces:", namespaces)
+
     """Extracts financial data from the XBRL SEC filing with improved error handling."""
     if not xbrl_url:
         return "No XBRL file found."
