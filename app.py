@@ -147,9 +147,9 @@ def extract_xbrl_value(tree, tag, namespaces):
             print("❌ ERROR: 'us-gaap' namespace not found in XBRL file!")
             return "N/A"
 
-        # ✅ Construct correct XPath query using `us-gaap` prefix
-        xpath_query = f"//{{{namespaces[us_gaap_prefix]}}}{tag}"
-        value_elements = tree.findall(xpath_query, namespaces)
+        # ✅ Construct correct XPath query
+        xpath_query = f"//*[local-name()='{tag}']"
+        value_elements = tree.xpath(xpath_query, namespaces=namespaces)
 
         # ✅ Debugging: Print extracted values
         if value_elements:
