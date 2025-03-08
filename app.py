@@ -89,15 +89,15 @@ def extract_summary(xbrl_url):
     if response.status_code != 200:
         return f"Error fetching XBRL report. Status: {response.status_code}"
 
-    # 🛑 Debug Logging: Ensure XBRL file is properly fetched
-    print("DEBUG: Checking XBRL content length:", len(response.content))
-    print("DEBUG: First 1000 characters of XBRL file:\n", response.text[:1000])
+    # 🛑 Debugging: Print XBRL File URL & First 1000 Characters
+    print(f"DEBUG: Fetching XBRL File from: {xbrl_url}")
+    print(f"DEBUG: First 1000 characters of XBRL file:\n{response.text[:1000]}")
 
     try:
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
-        # 🛑 Ensure the XBRL tree parsed correctly
+        # 🛑 Ensure XBRL File is Parsed Correctly
         if tree is None or not hasattr(tree, "nsmap"):
             print("ERROR: XBRL parsing failed. Tree is None or missing namespaces.")
             return "Error: Could not parse XBRL file."
@@ -105,6 +105,10 @@ def extract_summary(xbrl_url):
         # ✅ Extract **all** namespaces dynamically
         namespaces = tree.nsmap
         print("DEBUG: Extracted Namespaces:", namespaces)
+
+        # ✅ Print Full XML Structure for Analysis
+        print("DEBUG: Full XBRL Tree Structure:")
+        print(etree.tostring(tree, pretty_print=True).decode()[:2000])  # Print first 2000 characters
 
         # ✅ Extract Key Financial Data
         financials = {
@@ -117,6 +121,9 @@ def extract_summary(xbrl_url):
             "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
             "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
         }
+
+        # 🛑 Print Extracted Values for Debugging
+        print("DEBUG: Extracted Financial Data:", financials)
 
         return financials
 
