@@ -112,14 +112,14 @@ def extract_summary(xbrl_url):
 
         # ✅ Extract Key Financial Data
         financials = {
-            "Revenue": extract_xbrl_value(tree, "Revenues", namespaces),
-            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", namespaces),
-            "TotalAssets": extract_xbrl_value(tree, "Assets", namespaces),
-            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", namespaces),
-            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", namespaces),
-            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", namespaces),
-            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", namespaces),
-            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", namespaces)
+            "Revenue": extract_xbrl_value(tree, "Revenues"),
+            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss"),
+            "TotalAssets": extract_xbrl_value(tree, "Assets"),
+            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities"),
+            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities"),
+            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent"),
+            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent"),
+            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent")
         }
 
         # 🛑 Print Extracted Values for Debugging
