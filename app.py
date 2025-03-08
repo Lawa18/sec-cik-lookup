@@ -58,15 +58,20 @@ def find_xbrl_url(index_url):
         index_data = response.json()
         xbrl_file = None
 
-        # ✅ Look for structured XBRL files, avoiding summary & schemas
+        # ✅ Prioritize MAIN financial statement XBRL files
         for file in index_data["directory"]["item"]:
             name = file["name"].lower()
 
-            if name.endswith(".xml") and not name.endswith(("summary.xml", ".xsd")):
+            # ✅ Prefer _htm.xml or _full.xml (Contains actual data)
+            if name.endswith(("_htm.xml", "_full.xml")):
                 xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
-                break  # ✅ Select the first valid file
+                break  
 
-        print(f"DEBUG: Selected XBRL file: {xbrl_file}")
+        if not xbrl_file:
+            print("⚠️ WARNING: No valid XBRL file found in index.json.")
+        else:
+            print(f"DEBUG: ✅ Selected XBRL file: {xbrl_file}")
+
         return xbrl_file
 
     except Exception as e:
