@@ -136,11 +136,11 @@ def extract_summary(xbrl_url):
 def extract_xbrl_value(tree, tag, namespaces):
     """Extracts a specific financial value from XBRL with correct namespace handling."""
     try:
-        # ✅ Ensure 'us-gaap' is always referenced correctly
+        # ✅ Find the correct prefix for 'us-gaap'
         us_gaap_prefix = None
         for key, value in namespaces.items():
-            if "us-gaap" in value:
-                us_gaap_prefix = key  # Example: "us-gaap"
+            if "us-gaap" in value:  # Find the correct namespace prefix
+                us_gaap_prefix = key
                 break
 
         if not us_gaap_prefix:
