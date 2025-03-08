@@ -134,28 +134,29 @@ def extract_summary(xbrl_url):
         return f"Error extracting financial data: {str(e)}"
 
 def extract_xbrl_value(tree, tag, namespaces):
-    """Extracts a specific financial value from XBRL using correct namespaces."""
+    """Extracts a specific financial value from XBRL with correct namespace handling."""
     try:
-        # ✅ Find the correct namespace prefix for "us-gaap"
+        # ✅ Ensure 'us-gaap' namespace is properly referenced
         ns_prefix = None
         for key, value in namespaces.items():
-            if "us-gaap" in value:  # Looking for the namespace containing "us-gaap"
-                ns_prefix = key  # Get the correct prefix
+            if "us-gaap" in value:
+                ns_prefix = key
                 break
 
-        if not ns_prefix:
+        if ns_prefix:
+            xpath_query = f"//{ns_prefix}:{tag}"
+        else:
             print(f"⚠️ WARNING: 'us-gaap' namespace not found! Using default search.")
             xpath_query = f"//*[local-name()='{tag}']"
-        else:
-            xpath_query = f"//{ns_prefix}:{tag}"  # ✅ Use correct namespace prefix
 
         # ✅ Run XPath query with namespaces
-        value = tree.xpath(xpath_query, namespaces=namespaces)
+        value_elements = tree.xpath(xpath_query, namespaces=namespaces)
 
         # ✅ Debugging: Print extracted value
-        if value:
-            print(f"✅ DEBUG: Found {tag}: {value[0].text}")
-            return value[0].text
+        if value_elements:
+            extracted_value = value_elements[0].text
+            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
+            return extracted_value
         else:
             print(f"⚠️ WARNING: {tag} not found in XBRL document.")
             return "N/A"
