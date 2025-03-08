@@ -11,24 +11,29 @@ def fetch_sec_data(cik):
     
     return sec_response.json()
 
-
 def get_sec_financials(cik):
-    """Extract financials from SEC filings."""
+    """Extract financials from SEC filings safely."""
     data = fetch_sec_data(cik)
     if not data:
         return None
-    
+
     filings = data.get("filings", {}).get("recent", {})
-    
-    for i, form in enumerate(filings.get("form", [])):
+    forms = filings.get("form", [])
+
+    for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
+            # Ensure lists have the expected data
+            revenue = filings.get("totalRevenue", [None])
+            net_income = filings.get("netIncome", [None])
+            total_assets = filings.get("totalAssets", [None])
+
             return {
                 "company": data.get("name", "Unknown"),
                 "cik": cik,
                 "financials": {
-                    "Revenue": filings.get("totalRevenue", [None])[i],
-                    "NetIncome": filings.get("netIncome", [None])[i],
-                    "TotalAssets": filings.get("totalAssets", [None])[i]
+                    "Revenue": revenue[i] if i < len(revenue) else "N/A",
+                    "NetIncome": net_income[i] if i < len(net_income) else "N/A",
+                    "TotalAssets": total_assets[i] if i < len(total_assets) else "N/A"
                 }
             }
-    return None
+    return None  # If no valid filing is found
