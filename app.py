@@ -134,29 +134,30 @@ def extract_summary(xbrl_url):
         return f"Error extracting financial data: {str(e)}"
 
 def extract_xbrl_value(tree, tag, namespaces):
-    """Extracts a specific financial value from XBRL, handling namespaces correctly."""
+    """Extracts a specific financial value from XBRL using correct namespaces."""
     try:
-        # ✅ Check if "us-gaap" exists in the namespaces
-        us_gaap_ns = namespaces.get("us-gaap", "")
-        if not us_gaap_ns:
-            print(f"⚠️ WARNING: 'us-gaap' namespace not found! Using default namespace instead.")
-
-        # ✅ Build proper XPath query with namespace
-        xpath_query = f"//*[local-name()='{tag}']" if not us_gaap_ns else f"//us-gaap:{tag}"
+        # ✅ Ensure correct namespace prefix is used
+        ns_prefix = "us-gaap" if "us-gaap" in namespaces else None
         
-        # ✅ Run XPath query
+        if not ns_prefix:
+            print(f"⚠️ WARNING: 'us-gaap' namespace not found! Using default namespace instead.")
+            xpath_query = f"//*[local-name()='{tag}']"
+        else:
+            xpath_query = f"//{ns_prefix}:{tag}"
+
+        # ✅ Run XPath query using namespaces
         value = tree.xpath(xpath_query, namespaces=namespaces)
 
         # ✅ Debugging: Print what we found
         if value:
-            print(f"DEBUG: Found {tag}: {value[0].text}")
+            print(f"✅ DEBUG: Found {tag}: {value[0].text}")
             return value[0].text
         else:
             print(f"⚠️ WARNING: {tag} not found in XBRL document.")
             return "N/A"
-    
+
     except Exception as e:
-        print(f"ERROR: Could not extract {tag}: {str(e)}")
+        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
         return "N/A"
 
 @app.route("/financials", methods=["GET"])
