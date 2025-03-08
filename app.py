@@ -136,18 +136,19 @@ def extract_summary(xbrl_url):
 def extract_xbrl_value(tree, tag, namespaces):
     """Extracts a specific financial value from XBRL using correct namespaces."""
     try:
-        # ✅ Ensure correct namespace prefix
+        # ✅ Find the correct namespace prefix for "us-gaap"
         ns_prefix = None
         for key, value in namespaces.items():
-            if "us-gaap" in value:
-                ns_prefix = key  # Find the correct prefix for us-gaap
+            if "us-gaap" in value:  # Looking for the namespace containing "us-gaap"
+                ns_prefix = key  # Get the correct prefix
+                break
 
         if not ns_prefix:
             print(f"⚠️ WARNING: 'us-gaap' namespace not found! Using default search.")
             xpath_query = f"//*[local-name()='{tag}']"
         else:
-            xpath_query = f"//{ns_prefix}:{tag}"
-        
+            xpath_query = f"//{ns_prefix}:{tag}"  # ✅ Use correct namespace prefix
+
         # ✅ Run XPath query with namespaces
         value = tree.xpath(xpath_query, namespaces=namespaces)
 
