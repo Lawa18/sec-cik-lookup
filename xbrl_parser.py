@@ -99,11 +99,3 @@ def extract_xbrl_value(tree, tag, ns=None):
     except Exception as e:
         print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
         return "N/A"
-
-def extract_xbrl_value(tree, tag):
-    """Extracts the value of a specific XBRL financial tag."""
-    try:
-        value = tree.xpath(f"//*[local-name()='{tag}']/text()")
-        return value[0] if value else "N/A"
-    except Exception:
-        return "N/A"
