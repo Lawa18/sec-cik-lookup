@@ -8,9 +8,17 @@ app = Flask(__name__)
 @app.route("/financials", methods=["GET"])
 def financials():
     query = request.args.get("query", "").strip().lower()
+    print(f"🔍 DEBUG: Received query from GPT: {query}")  # ✅ Log incoming query
+
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
-    return jsonify(get_financial_data(query))
+
+    from data_router import get_financial_data
+    result = get_financial_data(query)
+
+    print(f"🔍 DEBUG: Result sent to GPT: {result}")  # ✅ Log response sent to GPT
+
+    return jsonify(result)
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
