@@ -78,9 +78,13 @@ def extract_summary(xbrl_url):
     except Exception as e:
         return f"Error extracting financial data: {str(e)}"
 
-def extract_xbrl_value(tree, tag, ns):
+def extract_xbrl_value(tree, tag, ns=None):
     """Extracts the value of a specific XBRL financial tag using namespace handling."""
     try:
+        # Handle cases where no namespace is provided
+        if ns is None:
+            ns = {}
+
         xpath_query = f"//*[local-name()='{tag}']"
         value = tree.xpath(xpath_query + "/text()", namespaces=ns)
         
