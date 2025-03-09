@@ -11,8 +11,10 @@ def fetch_sec_data(cik):
     
     return sec_response.json()
 
+from sec_api import find_xbrl_url, extract_summary
+
 def get_sec_financials(cik):
-    """Extract financials from SEC filings safely."""
+    """Extract financials from SEC filings using XBRL if JSON data is missing."""
     data = fetch_sec_data(cik)
     if not data:
         return None
@@ -22,18 +24,24 @@ def get_sec_financials(cik):
 
     for i, form in enumerate(forms):
         if form in ["10-K", "10-Q"]:
-            # Ensure lists have the expected data
-            revenue = filings.get("totalRevenue", [None])
-            net_income = filings.get("netIncome", [None])
-            total_assets = filings.get("totalAssets", [None])
+            accession_number = filings.get("accessionNumber", [None])[i]
+            if not accession_number:
+                return {"error": "Accession number not found."}
+
+            # ✅ Restore XBRL Extraction
+            index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
+            xbrl_url = find_xbrl_url(index_url)
+            financials = extract_summary(xbrl_url) if xbrl_url else "XBRL file not found."
 
             return {
                 "company": data.get("name", "Unknown"),
                 "cik": cik,
-                "financials": {
-                    "Revenue": revenue[i] if i < len(revenue) else "N/A",
-                    "NetIncome": net_income[i] if i < len(net_income) else "N/A",
-                    "TotalAssets": total_assets[i] if i < len(total_assets) else "N/A"
+                "latest_filing": {
+                    "formType": form,
+                    "filingDate": filings.get("filingDate", ["N/A"])[i],
+                    "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
+                    "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
+                    "financials": financials
                 }
             }
-    return None  # If no valid filing is found
+    return None
