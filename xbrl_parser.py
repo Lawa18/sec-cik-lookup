@@ -27,8 +27,11 @@ def find_xbrl_url(index_url):
         print(f"ERROR: Could not parse SEC index.json: {e}")
         return None
 
+import requests
+from lxml import etree
+
 def extract_summary(xbrl_url):
-    """Extracts financial data from XBRL SEC filing."""
+    """Extracts financial data from XBRL SEC filing with better namespace handling."""
     if not xbrl_url:
         return "No XBRL file found."
 
@@ -42,21 +45,56 @@ def extract_summary(xbrl_url):
         parser = etree.XMLParser(recover=True)
         tree = etree.fromstring(response.content, parser=parser)
 
+        # ✅ Debug: Print XBRL Namespace Map
+        namespaces = tree.nsmap
+        print("🔍 DEBUG: Extracted Namespaces from XBRL:", namespaces)
+
+        # ✅ Debug: Print First 1000 Characters of XBRL File
+        print(f"🔍 DEBUG: XBRL File Content (First 1000 chars):\n{response.text[:1000]}")
+
+        # 🛠 Ensure correct namespace handling
+        ns = {"x": namespaces[None]} if None in namespaces else {}
+        print("✅ DEBUG: Namespace used in queries:", ns)
+
+        # ✅ Extract Key Financial Data with Namespace Fix
         financials = {
-            "Revenue": extract_xbrl_value(tree, "Revenues"),
-            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss"),
-            "TotalAssets": extract_xbrl_value(tree, "Assets"),
-            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities"),
-            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities"),
-            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent"),
-            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent"),
-            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent")
+            "Revenue": extract_xbrl_value(tree, "Revenues", ns),
+            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", ns),
+            "TotalAssets": extract_xbrl_value(tree, "Assets", ns),
+            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", ns),
+            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", ns),
+            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", ns),
+            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", ns),
+            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", ns)
         }
+
+        print("✅ DEBUG: Extracted Financial Data:", financials)
 
         return financials
 
+    except etree.XMLSyntaxError:
+        return "Error: XML Syntax Error - File may be corrupted."
+
     except Exception as e:
         return f"Error extracting financial data: {str(e)}"
+
+def extract_xbrl_value(tree, tag, ns):
+    """Extracts the value of a specific XBRL financial tag using namespace handling."""
+    try:
+        xpath_query = f"//*[local-name()='{tag}']"
+        value = tree.xpath(xpath_query + "/text()", namespaces=ns)
+        
+        if value:
+            extracted_value = value[0]
+            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
+            return extracted_value
+        else:
+            print(f"⚠️ WARNING: {tag} not found in XBRL document.")
+            return "N/A"
+
+    except Exception as e:
+        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
+        return "N/A"
 
 def extract_xbrl_value(tree, tag):
     """Extracts the value of a specific XBRL financial tag."""
