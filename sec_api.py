@@ -14,34 +14,34 @@ def fetch_sec_data(cik):
 
     return sec_response.json()
 
-def get_sec_financials(cik, max_years=5, max_quarters=4):
-    """Extracts the last N years of 10-K (annual) and last N quarters of 10-Q filings from SEC."""
+def get_sec_financials(cik):
+    """Extracts financials for the last 5 years of 10-Ks and last 4 quarters of 10-Qs."""
     data = fetch_sec_data(cik)
     if not data:
         return None
 
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
-    filing_dates = filings.get("filingDate", [])
-    
+
     historical_annuals = []
     historical_quarters = []
+    
     seen_years = set()
     seen_quarters = 0
 
     for i, form in enumerate(forms):
-        filing_year = filing_dates[i][:4]  # Extract YYYY from YYYY-MM-DD format
+        filing_year = filings.get("filingDate", ["N/A"])[i][:4]  # Extract YYYY from YYYY-MM-DD format
         
-        if form == "10-K" and filing_year not in seen_years and len(seen_years) < max_years:
+        if form == "10-K" and filing_year not in seen_years and len(seen_years) < 5:
             seen_years.add(filing_year)
-        elif form == "10-Q" and seen_quarters < max_quarters:
+        elif form == "10-Q" and seen_quarters < 4:
             seen_quarters += 1
         else:
             continue  # Skip if we already have enough filings
 
         accession_number = filings.get("accessionNumber", [None])[i]
         if not accession_number:
-            continue  # Skip if no accession number
+            continue
 
         from xbrl_parser import find_xbrl_url, extract_summary
         index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
@@ -50,7 +50,7 @@ def get_sec_financials(cik, max_years=5, max_quarters=4):
 
         filing_data = {
             "formType": form,
-            "filingDate": filing_dates[i],
+            "filingDate": filings.get("filingDate", ["N/A"])[i],
             "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
             "financials": financials
