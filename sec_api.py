@@ -15,14 +15,14 @@ def fetch_sec_data(cik):
     return sec_response.json()
 
 def get_sec_financials(cik):
-    """Extracts financials for the last 5 years of 10-Ks and last 4 quarters of 10-Qs."""
+    """Extracts the last 5 years of annual and last 4 quarters of financials from SEC filings."""
     data = fetch_sec_data(cik)
     if not data:
         return None
 
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
-
+    
     historical_annuals = []
     historical_quarters = []
     
@@ -32,9 +32,9 @@ def get_sec_financials(cik):
     for i, form in enumerate(forms):
         filing_year = filings.get("filingDate", ["N/A"])[i][:4]  # Extract YYYY from YYYY-MM-DD format
         
-        if form == "10-K" and filing_year not in seen_years and len(seen_years) < 5:
+        if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 5:
             seen_years.add(filing_year)
-        elif form == "10-Q" and seen_quarters < 4:
+        elif form in ["10-Q", "6-K"] and seen_quarters < 4:
             seen_quarters += 1
         else:
             continue  # Skip if we already have enough filings
@@ -56,9 +56,9 @@ def get_sec_financials(cik):
             "financials": financials
         }
 
-        if form == "10-K":
+        if form in ["10-K", "20-F"]:
             historical_annuals.append(filing_data)
-        elif form == "10-Q":
+        elif form in ["10-Q", "6-K"]:
             historical_quarters.append(filing_data)
 
     return {
