@@ -1,4 +1,5 @@
 import requests
+from xbrl_parser import find_xbrl_url, extract_summary  # ✅ Import once at the top
 
 def fetch_sec_data(cik):
     """Fetch latest and historical financials from SEC API."""
@@ -22,7 +23,9 @@ def get_sec_financials(cik):
 
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
-    
+    filing_dates = filings.get("filingDate", [])  # ✅ Store this separately for safe access
+    accession_numbers = filings.get("accessionNumber", [])
+
     historical_annuals = []
     historical_quarters = []
     
@@ -30,8 +33,11 @@ def get_sec_financials(cik):
     seen_quarters = 0
 
     for i, form in enumerate(forms):
-        filing_year = filings.get("filingDate", ["N/A"])[i][:4]  # Extract YYYY from YYYY-MM-DD format
-        
+        if i >= len(filing_dates) or i >= len(accession_numbers):  # ✅ Prevent index errors
+            continue
+
+        filing_year = filing_dates[i][:4] if filing_dates[i] else "N/A"
+
         if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 5:
             seen_years.add(filing_year)
         elif form in ["10-Q", "6-K"] and seen_quarters < 4:
@@ -39,35 +45,29 @@ def get_sec_financials(cik):
         else:
             continue  # Skip if we already have enough filings
 
-        accession_number = filings.get("accessionNumber", [None])[i]
+        accession_number = accession_numbers[i]
         if not accession_number:
             continue
 
-        from xbrl_parser import find_xbrl_url, extract_summary
         index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
         xbrl_url = find_xbrl_url(index_url)
         financials = extract_summary(xbrl_url) if xbrl_url else {}
 
         filing_data = {
             "formType": form,
-            "filingDate": filings.get("filingDate", ["N/A"])[i],
+            "filingDate": filing_dates[i] if i < len(filing_dates) else "N/A",
             "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
             "financials": financials
         }
-        
-        # Inside get_sec_financials()
-    valid_quarters = []
-        for filing in historical_quarters:
-        if any(value != "N/A" for value in filing["financials"].values()):  # ✅ Keep only valid 6-Ks
-        valid_quarters.append(filing)
-
-historical_quarters = valid_quarters
 
         if form in ["10-K", "20-F"]:
             historical_annuals.append(filing_data)
         elif form in ["10-Q", "6-K"]:
             historical_quarters.append(filing_data)
+
+    # ✅ Filter out 6-Ks with no financial data
+    historical_quarters = [filing for filing in historical_quarters if any(value != "N/A" for value in filing["financials"].values())]
 
     return {
         "company": data.get("name", "Unknown"),
