@@ -55,6 +55,14 @@ def get_sec_financials(cik):
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
             "financials": financials
         }
+        
+        # Inside get_sec_financials()
+    valid_quarters = []
+        for filing in historical_quarters:
+        if any(value != "N/A" for value in filing["financials"].values()):  # ✅ Keep only valid 6-Ks
+        valid_quarters.append(filing)
+
+historical_quarters = valid_quarters
 
         if form in ["10-K", "20-F"]:
             historical_annuals.append(filing_data)
