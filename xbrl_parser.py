@@ -31,52 +31,43 @@ import requests
 from lxml import etree
 
 def extract_summary(xbrl_url):
-    """Extracts financial data from XBRL SEC filing with better namespace handling."""
-    if not xbrl_url:
-        return "No XBRL file found."
+    """Parses XBRL data to extract key financial metrics, supporting IFRS & US-GAAP."""
+    import requests
+    from lxml import etree
+
+    if "XBRL file not found" in xbrl_url:
+        return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
     response = requests.get(xbrl_url, headers=headers)
 
     if response.status_code != 200:
-        return f"Error fetching XBRL report. Status: {response.status_code}"
+        return {}
 
-    try:
-        parser = etree.XMLParser(recover=True)
-        tree = etree.fromstring(response.content, parser=parser)
+    root = etree.fromstring(response.content)
 
-        # ✅ Debug: Print XBRL Namespace Map
-        namespaces = tree.nsmap
-        print("🔍 DEBUG: Extracted Namespaces from XBRL:", namespaces)
+    # ✅ Define both US-GAAP & IFRS namespaces
+    namespaces = {
+        "us-gaap": "http://fasb.org/us-gaap/2024",
+        "ifrs": "http://xbrl.ifrs.org/taxonomy/2024",
+        "x": "http://www.xbrl.org/2003/instance"
+    }
 
-        # ✅ Debug: Print First 1000 Characters of XBRL File
-        print(f"🔍 DEBUG: XBRL File Content (First 1000 chars):\n{response.text[:1000]}")
+    def get_value(tag):
+        """Extracts value from XBRL, checking IFRS first, then US-GAAP."""
+        value = root.xpath(f"//ifrs:{tag} | //us-gaap:{tag}", namespaces=namespaces)
+        return value[0].text if value else "N/A"
 
-        # 🛠 Ensure correct namespace handling
-        ns = {"x": namespaces[None]} if None in namespaces else {}
-        print("✅ DEBUG: Namespace used in queries:", ns)
-
-        # ✅ Extract Key Financial Data with Namespace Fix
-        financials = {
-            "Revenue": extract_xbrl_value(tree, "Revenues", ns),
-            "NetIncome": extract_xbrl_value(tree, "NetIncomeLoss", ns),
-            "TotalAssets": extract_xbrl_value(tree, "Assets", ns),
-            "TotalLiabilities": extract_xbrl_value(tree, "Liabilities", ns),
-            "OperatingCashFlow": extract_xbrl_value(tree, "NetCashProvidedByUsedInOperatingActivities", ns),
-            "CurrentAssets": extract_xbrl_value(tree, "AssetsCurrent", ns),
-            "CurrentLiabilities": extract_xbrl_value(tree, "LiabilitiesCurrent", ns),
-            "Debt": extract_xbrl_value(tree, "LongTermDebtNoncurrent", ns)
-        }
-
-        print("✅ DEBUG: Extracted Financial Data:", financials)
-
-        return financials
-
-    except etree.XMLSyntaxError:
-        return "Error: XML Syntax Error - File may be corrupted."
-
-    except Exception as e:
-        return f"Error extracting financial data: {str(e)}"
+    return {
+        "Revenue": get_value("Revenue"),
+        "NetIncome": get_value("ProfitLoss"),  # IFRS uses "ProfitLoss" instead of "NetIncome"
+        "TotalAssets": get_value("Assets"),
+        "TotalLiabilities": get_value("Liabilities"),
+        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
+        "CurrentAssets": get_value("CurrentAssets"),
+        "CurrentLiabilities": get_value("CurrentLiabilities"),
+        "Debt": get_value("NoncurrentLiabilities"),
+    }
 
 def extract_xbrl_value(tree, tag, ns=None):
     """Extracts the value of a specific XBRL financial tag using namespace handling."""
