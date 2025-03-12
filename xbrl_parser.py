@@ -35,7 +35,7 @@ def extract_summary(xbrl_url):
     root = etree.fromstring(response.content)
 
     # ✅ Extract available namespaces dynamically
-    namespaces = {k: v for k, v in root.nsmap.items() if v}
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items() if v}
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
     # ✅ Identify standard namespaces (if available)
@@ -47,19 +47,19 @@ def extract_summary(xbrl_url):
     elif "us-gaap" in namespaces:
         ns_prefix = "us-gaap"
 
-    # ✅ Handle Default Namespace
-    default_ns = namespaces.get(None, "")
+    # ✅ Handle Default Namespace by assigning "default"
+    default_ns = namespaces.get("default", "")
 
     def get_value(tag):
         """Extracts financial values using correct XPath syntax for namespaces."""
         try:
             if ns_prefix and ns_prefix in namespaces:
-                # ✅ Use namespace prefix if available
+                # ✅ Use named namespace if available
                 xpath_query = f"//{ns_prefix}:{tag}"
                 value = root.xpath(xpath_query, namespaces=namespaces)
             elif default_ns:
-                # ✅ Bind default namespace to a prefix (required for XPath)
-                ns_map = {'default': default_ns}
+                # ✅ Bind default namespace to "default" and use it in XPath
+                ns_map = {"default": default_ns}
                 xpath_query = f"//default:{tag}"
                 value = root.xpath(xpath_query, namespaces=ns_map)
             else:
