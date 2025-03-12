@@ -33,13 +33,27 @@ def extract_summary(xbrl_url):
 
     root = etree.fromstring(response.content)
 
-    # Extract available namespaces
+    # ✅ Dynamically Extract Available Namespaces
     namespaces = {k: v for k, v in root.nsmap.items() if v}
-    ns_prefix = next((k for k in ["ifrs-full", "ifrs", "us-gaap"] if k in namespaces), "x")  # Default to "x"
+    
+    # ✅ Determine which namespace to use
+    if "ifrs-full" in namespaces:
+        ns_prefix = "ifrs-full"
+    elif "ifrs" in namespaces:
+        ns_prefix = "ifrs"
+    elif "us-gaap" in namespaces:
+        ns_prefix = "us-gaap"
+    elif None in namespaces:  # ✅ Handle default namespace (No Prefix)
+        ns_prefix = None  # No prefix needed
+    else:
+        return {}  # 🚨 No recognizable namespace, return empty dict
 
     def get_value(tag):
         """Extracts financial values using dynamic namespace detection."""
-        value = root.xpath(f"//{ns_prefix}:{tag}", namespaces=namespaces)
+        if ns_prefix:
+            value = root.xpath(f"//{ns_prefix}:{tag}", namespaces=namespaces)
+        else:
+            value = root.xpath(f"//{tag}")  # ✅ Handle default namespace (No Prefix)
         return value[0].text if value else "N/A"
 
     return {
