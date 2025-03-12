@@ -1,4 +1,5 @@
 import requests
+import json
 from lxml import etree
 
 def find_xbrl_url(index_url):
@@ -33,58 +34,19 @@ def extract_summary(xbrl_url):
 
     root = etree.fromstring(response.content)
 
-    # ✅ Dynamically Extract Available Namespaces
+    # ✅ Extract available namespaces dynamically
     namespaces = {k: v for k, v in root.nsmap.items() if v}
-    
-    # ✅ Determine which namespace to use
-    if "ifrs-full" in namespaces:
-        ns_prefix = "ifrs-full"
-    elif "ifrs" in namespaces:
-        ns_prefix = "ifrs"
-    elif "us-gaap" in namespaces:
-        ns_prefix = "us-gaap"
-    elif None in namespaces:  # ✅ Handle default namespace (No Prefix)
-        ns_prefix = None  # No prefix needed
-    else:
-        return {}  # 🚨 No recognizable namespace, return empty dict
+    print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
+
+    # ✅ Allow multi-namespace search (IFRS, US-GAAP, or Default)
+    known_ns = ["ifrs-full", "ifrs", "us-gaap"]
+    active_ns = [ns for ns in known_ns if ns in namespaces]
 
     def get_value(tag):
-        """Extracts financial values using dynamic namespace detection."""
-        if ns_prefix:
-            value = root.xpath(f"//{ns_prefix}:{tag}", namespaces=namespaces)
-        else:
-            value = root.xpath(f"//{tag}")  # ✅ Handle default namespace (No Prefix)
-        return value[0].text if value else "N/A"
-
-    return {
-        "Revenue": get_value("Revenue"),
-        "NetIncome": get_value("ProfitLoss"),
-        "TotalAssets": get_value("Assets"),
-        "TotalLiabilities": get_value("Liabilities"),
-        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
-        "CurrentAssets": get_value("CurrentAssets"),
-        "CurrentLiabilities": get_value("CurrentLiabilities"),
-        "Debt": get_value("NoncurrentLiabilities"),
-    }
-
-def extract_xbrl_value(tree, tag, ns=None):
-    """Extracts the value of a specific XBRL financial tag using namespace handling."""
-    try:
-        # Handle cases where no namespace is provided
-        if ns is None:
-            ns = {}
-
-        xpath_query = f"//*[local-name()='{tag}']"
-        value = tree.xpath(xpath_query + "/text()", namespaces=ns)
-        
-        if value:
-            extracted_value = value[0]
-            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
-            return extracted_value
-        else:
-            print(f"⚠️ WARNING: {tag} not found in XBRL document.")
-            return "N/A"
-
-    except Exception as e:
-        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
-        return "N/A"
+        """Extracts financial values using multi-namespace detection."""
+        for ns in active_ns:  # ✅ Try each known namespace
+            xpath_query = f"//{ns}:{tag}"
+            try:
+                value = root.xpath(xpath_query, namespaces=namespaces)
+                if value:
+                    print(f"✅ DEBUG: Found {tag} in {ns}: {value[0].text}")
