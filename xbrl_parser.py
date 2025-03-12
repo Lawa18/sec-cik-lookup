@@ -50,31 +50,31 @@ def extract_summary(xbrl_url):
     # ✅ Handle Default Namespace by assigning "default"
     default_ns = namespaces.get("default", "")
 
-    def get_value(tag):
-        """Extracts financial values using correct XPath syntax for namespaces."""
-        try:
-            if ns_prefix and ns_prefix in namespaces:
-                # ✅ Use named namespace if available
-                xpath_query = f"//{ns_prefix}:{tag}"
-                value = root.xpath(xpath_query, namespaces=namespaces)
-            elif default_ns:
-                # ✅ Bind default namespace to "default" and use it in XPath
-                ns_map = {"default": default_ns}
-                xpath_query = f"//default:{tag}"
-                value = root.xpath(xpath_query, namespaces=ns_map)
-            else:
-                # ✅ Handle elements with NO namespace at all
-                xpath_query = f"//*[local-name()='{tag}']"
-                value = root.xpath(xpath_query + "/text()")
+def get_value(tag):
+    """Extracts financial values as text using correct namespace handling."""
+    try:
+        if ns_prefix and ns_prefix in namespaces:
+            # ✅ Use named namespace if available
+            xpath_query = f"//{ns_prefix}:{tag}"
+            value = root.xpath(xpath_query, namespaces=namespaces)
+        elif default_ns:
+            # ✅ Bind default namespace to "default" and use it in XPath
+            ns_map = {"default": default_ns}
+            xpath_query = f"//default:{tag}"
+            value = root.xpath(xpath_query, namespaces=ns_map)
+        else:
+            # ✅ Handle elements with NO namespace at all
+            xpath_query = f"//*[local-name()='{tag}']"
+            value = root.xpath(xpath_query + "/text()")
 
-            if value:
-                print(f"✅ DEBUG: Found {tag}: {value[0]}")
-                return value[0]
+        # ✅ Convert XML Element to string (or return "N/A" if empty)
+        extracted_value = value[0].text if value and hasattr(value[0], "text") else value[0] if value else "N/A"
+        
+        print(f"✅ DEBUG: Extracted {tag}: {extracted_value}")
+        return extracted_value
 
-        except etree.XPathEvalError:
-            print(f"⚠️ WARNING: XPath failed for {tag}. Trying alternative method.")
-
-        print(f"⚠️ WARNING: {tag} not found in any namespace.")
+    except Exception as e:
+        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
         return "N/A"
 
     return {
