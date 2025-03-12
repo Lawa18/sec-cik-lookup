@@ -24,62 +24,34 @@ def find_xbrl_url(index_url):
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url or "XBRL file not found" in xbrl_url:
+        print(f"❌ ERROR: Invalid XBRL URL: {xbrl_url}")
         return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
     response = requests.get(xbrl_url, headers=headers)
 
     if response.status_code != 200:
+        print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
         return {}
 
-    root = etree.fromstring(response.content)
+    try:
+        root = etree.fromstring(response.content)
+    except etree.XMLSyntaxError as e:
+        print(f"❌ ERROR: XML parsing failed: {e}")
+        return {}
 
-    # ✅ Extract available namespaces dynamically
-    namespaces = {k if k else "default": v for k, v in root.nsmap.items() if v}
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Avoid empty namespace issues
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Identify standard namespaces (if available)
-    ns_prefix = None
-    if "ifrs-full" in namespaces:
-        ns_prefix = "ifrs-full"
-    elif "ifrs" in namespaces:
-        ns_prefix = "ifrs"
-    elif "us-gaap" in namespaces:
-        ns_prefix = "us-gaap"
+    def get_value(tag):
+        """Extracts financial values using dynamic namespace detection."""
+        xpath_query = f"//*[local-name()='{tag}']"
+        value = root.xpath(xpath_query + "/text()", namespaces=namespaces)
+        return value[0] if value else "N/A"
 
-    # ✅ Handle Default Namespace by assigning "default"
-    default_ns = namespaces.get("default", "")
-
-def get_value(tag):
-    """Extracts financial values as text using correct namespace handling."""
-    try:
-        if ns_prefix and ns_prefix in namespaces:
-            # ✅ Use named namespace if available
-            xpath_query = f"//{ns_prefix}:{tag}"
-            value = root.xpath(xpath_query, namespaces=namespaces)
-        elif default_ns:
-            # ✅ Bind default namespace to "default" and use it in XPath
-            ns_map = {"default": default_ns}
-            xpath_query = f"//default:{tag}"
-            value = root.xpath(xpath_query, namespaces=ns_map)
-        else:
-            # ✅ Handle elements with NO namespace at all
-            xpath_query = f"//*[local-name()='{tag}']"
-            value = root.xpath(xpath_query + "/text()")
-
-        # ✅ Convert XML Element to string (or return "N/A" if empty)
-        extracted_value = value[0].text if value and hasattr(value[0], "text") else value[0] if value else "N/A"
-        
-        print(f"✅ DEBUG: Extracted {tag}: {extracted_value}")
-        return extracted_value
-
-    except Exception as e:
-        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
-        return "N/A"
-
-    return {
+    financials = {
         "Revenue": get_value("Revenue"),
-        "NetIncome": get_value("ProfitLoss"),  # IFRS uses "ProfitLoss" instead of "NetIncome"
+        "NetIncome": get_value("ProfitLoss"),
         "TotalAssets": get_value("Assets"),
         "TotalLiabilities": get_value("Liabilities"),
         "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
@@ -87,6 +59,10 @@ def get_value(tag):
         "CurrentLiabilities": get_value("CurrentLiabilities"),
         "Debt": get_value("NoncurrentLiabilities"),
     }
+
+    print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Add debug print
+
+    return financials
 
 def extract_xbrl_value(tree, tag, ns=None):
     """Extracts the value of a specific XBRL financial tag using namespace handling."""
