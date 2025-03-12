@@ -1,5 +1,5 @@
 import requests
-import json
+from lxml import etree
 
 def find_xbrl_url(index_url):
     """Finds the XBRL file URL from an SEC index.json."""
@@ -20,12 +20,9 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
-import requests
-from lxml import etree
-
 def extract_summary(xbrl_url):
-    """Parses XBRL data to extract key financial metrics, supporting IFRS & US-GAAP."""
-    if "XBRL file not found" in xbrl_url:
+    """Parses XBRL data to extract key financial metrics."""
+    if not xbrl_url or "XBRL file not found" in xbrl_url:
         return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
@@ -36,25 +33,18 @@ def extract_summary(xbrl_url):
 
     root = etree.fromstring(response.content)
 
-    # ✅ Dynamically Extract All Available Namespaces
+    # Extract available namespaces
     namespaces = {k: v for k, v in root.nsmap.items() if v}
-    if "ifrs-full" in namespaces:
-        ns_prefix = "ifrs-full"
-    elif "ifrs" in namespaces:
-        ns_prefix = "ifrs"
-    elif "us-gaap" in namespaces:
-        ns_prefix = "us-gaap"
-    else:
-        ns_prefix = "x"  # Default fallback
+    ns_prefix = next((k for k in ["ifrs-full", "ifrs", "us-gaap"] if k in namespaces), "x")  # Default to "x"
 
     def get_value(tag):
-        """Extracts value from XBRL, dynamically detecting namespace prefixes."""
+        """Extracts financial values using dynamic namespace detection."""
         value = root.xpath(f"//{ns_prefix}:{tag}", namespaces=namespaces)
         return value[0].text if value else "N/A"
 
     return {
         "Revenue": get_value("Revenue"),
-        "NetIncome": get_value("ProfitLoss"),  # IFRS uses "ProfitLoss" instead of "NetIncome"
+        "NetIncome": get_value("ProfitLoss"),
         "TotalAssets": get_value("Assets"),
         "TotalLiabilities": get_value("Liabilities"),
         "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
