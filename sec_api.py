@@ -8,10 +8,13 @@ def fetch_sec_data(cik):
         "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",
         "Accept": "application/json"
     }
-    sec_response = requests.get(sec_url, headers=headers)
-
-    if sec_response.status_code != 200:
-        return None
+    
+    try:
+        sec_response = requests.get(sec_url, headers=headers, timeout=10)  # ✅ Added timeout for reliability
+        sec_response.raise_for_status()  # ✅ Raises an error for bad responses (4xx, 5xx)
+    except requests.RequestException as e:
+        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
+        return {}  # ✅ Return empty dictionary instead of None to prevent crashes
 
     return sec_response.json()
 
@@ -19,12 +22,18 @@ def get_sec_financials(cik):
     """Extracts the last 5 years of annual and last 4 quarters of financials from SEC filings."""
     data = fetch_sec_data(cik)
     if not data:
-        return None
+        return {
+            "company": "Unknown",
+            "cik": cik,
+            "historical_annuals": [],
+            "historical_quarters": []
+        }
 
     filings = data.get("filings", {}).get("recent", {})
     forms = filings.get("form", [])
-    filing_dates = filings.get("filingDate", [])  # ✅ Store this separately for safe access
+    filing_dates = filings.get("filingDate", [])
     accession_numbers = filings.get("accessionNumber", [])
+    primary_documents = filings.get("primaryDocument", [])
 
     historical_annuals = []
     historical_quarters = []
@@ -33,7 +42,8 @@ def get_sec_financials(cik):
     seen_quarters = 0
 
     for i, form in enumerate(forms):
-        if i >= len(filing_dates) or i >= len(accession_numbers):  # ✅ Prevent index errors
+        # ✅ Prevent index errors
+        if i >= len(filing_dates) or i >= len(accession_numbers) or i >= len(primary_documents):
             continue
 
         filing_year = filing_dates[i][:4] if filing_dates[i] else "N/A"
@@ -43,7 +53,7 @@ def get_sec_financials(cik):
         elif form in ["10-Q", "6-K"] and seen_quarters < 4:
             seen_quarters += 1
         else:
-            continue  # Skip if we already have enough filings
+            continue  # ✅ Skip if we already have enough filings
 
         accession_number = accession_numbers[i]
         if not accession_number:
@@ -55,8 +65,8 @@ def get_sec_financials(cik):
 
         filing_data = {
             "formType": form,
-            "filingDate": filing_dates[i] if i < len(filing_dates) else "N/A",
-            "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{filings.get('primaryDocument', [''])[i]}",
+            "filingDate": filing_dates[i],
+            "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{primary_documents[i]}",
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
             "financials": financials
         }
@@ -67,7 +77,10 @@ def get_sec_financials(cik):
             historical_quarters.append(filing_data)
 
     # ✅ Filter out 6-Ks with no financial data
-    historical_quarters = [filing for filing in historical_quarters if any(value != "N/A" for value in filing["financials"].values())]
+    historical_quarters = [
+        filing for filing in historical_quarters 
+        if filing.get("financials") and isinstance(filing["financials"], dict) and any(value != "N/A" for value in filing["financials"].values())
+    ]
 
     return {
         "company": data.get("name", "Unknown"),
