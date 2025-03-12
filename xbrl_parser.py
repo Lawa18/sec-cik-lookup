@@ -1,40 +1,8 @@
 import requests
 from lxml import etree
 
-def find_xbrl_url(index_url):
-    """Fetches SEC index.json and finds the correct XBRL file for financial data."""
-    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(index_url, headers=headers)
-
-    if response.status_code != 200:
-        print(f"ERROR: Failed to fetch index.json. Status: {response.status_code}")
-        return None
-
-    try:
-        index_data = response.json()
-        xbrl_file = None
-
-        # ✅ Prioritize MAIN financial statement XBRL files
-        for file in index_data["directory"]["item"]:
-            name = file["name"].lower()
-            if name.endswith(("_htm.xml", "_full.xml")):
-                xbrl_file = f"{index_url.rsplit('/', 1)[0]}/{file['name']}"
-                break  
-
-        return xbrl_file
-
-    except Exception as e:
-        print(f"ERROR: Could not parse SEC index.json: {e}")
-        return None
-
-import requests
-from lxml import etree
-
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics, supporting IFRS & US-GAAP."""
-    import requests
-    from lxml import etree
-
     if "XBRL file not found" in xbrl_url:
         return {}
 
@@ -46,16 +14,20 @@ def extract_summary(xbrl_url):
 
     root = etree.fromstring(response.content)
 
-    # ✅ Define both US-GAAP & IFRS namespaces
-    namespaces = {
-        "us-gaap": "http://fasb.org/us-gaap/2024",
-        "ifrs": "http://xbrl.ifrs.org/taxonomy/2024",
-        "x": "http://www.xbrl.org/2003/instance"
-    }
+    # ✅ Dynamically Extract All Available Namespaces
+    namespaces = {k: v for k, v in root.nsmap.items() if v}
+    if "ifrs-full" in namespaces:
+        ns_prefix = "ifrs-full"
+    elif "ifrs" in namespaces:
+        ns_prefix = "ifrs"
+    elif "us-gaap" in namespaces:
+        ns_prefix = "us-gaap"
+    else:
+        ns_prefix = "x"  # Default fallback
 
     def get_value(tag):
-        """Extracts value from XBRL, checking IFRS first, then US-GAAP."""
-        value = root.xpath(f"//ifrs:{tag} | //us-gaap:{tag}", namespaces=namespaces)
+        """Extracts value from XBRL, dynamically detecting namespace prefixes."""
+        value = root.xpath(f"//{ns_prefix}:{tag}", namespaces=namespaces)
         return value[0].text if value else "N/A"
 
     return {
