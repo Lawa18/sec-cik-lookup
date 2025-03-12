@@ -21,10 +21,6 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
-import requests
-import json
-from lxml import etree
-
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url or "XBRL file not found" in xbrl_url:
