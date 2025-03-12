@@ -21,6 +21,10 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
+import requests
+import json
+from lxml import etree
+
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url or "XBRL file not found" in xbrl_url:
@@ -34,32 +38,37 @@ def extract_summary(xbrl_url):
 
     root = etree.fromstring(response.content)
 
-    # ✅ Extract available namespaces dynamically
+    # ✅ Extract all namespaces dynamically
     namespaces = {k: v for k, v in root.nsmap.items() if v}
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Allow multi-namespace search (IFRS, US-GAAP, or Default)
-    known_ns = ["ifrs-full", "ifrs", "us-gaap"]
-    active_ns = [ns for ns in known_ns if ns in namespaces]
+    # ✅ Identify standard namespaces (if available)
+    ns_prefix = None
+    if "ifrs-full" in namespaces:
+        ns_prefix = "ifrs-full"
+    elif "ifrs" in namespaces:
+        ns_prefix = "ifrs"
+    elif "us-gaap" in namespaces:
+        ns_prefix = "us-gaap"
 
     def get_value(tag):
-        """Extracts financial values using multi-namespace detection."""
-        for ns in active_ns:  # ✅ Try each known namespace
-            xpath_query = f"//{ns}:{tag}"
-            try:
+        """Extracts financial values using correct XPath syntax for namespaces."""
+        try:
+            if ns_prefix:
+                # ✅ If namespace exists, use the correct prefix
+                xpath_query = f"//{ns_prefix}:{tag}"
                 value = root.xpath(xpath_query, namespaces=namespaces)
-                if value:
-                    print(f"✅ DEBUG: Found {tag} in {ns}: {value[0].text}")
-                    return value[0].text
-            except etree.XPathEvalError:
-                continue  # Move to the next namespace
+            else:
+                # ✅ Handle cases where NO namespace is used
+                xpath_query = f"//*[local-name()='{tag}']"
+                value = root.xpath(xpath_query + "/text()")
 
-        # ✅ Handle cases where NO namespace is used
-        xpath_query = f"//*[local-name()='{tag}']"
-        value = root.xpath(xpath_query + "/text()", namespaces=namespaces)
-        if value:
-            print(f"✅ DEBUG: Found {tag} (No Namespace): {value[0]}")
-            return value[0]
+            if value:
+                print(f"✅ DEBUG: Found {tag}: {value[0]}")
+                return value[0]
+
+        except etree.XPathEvalError:
+            print(f"⚠️ WARNING: XPath failed for {tag}. Trying alternative method.")
 
         print(f"⚠️ WARNING: {tag} not found in any namespace.")
         return "N/A"
