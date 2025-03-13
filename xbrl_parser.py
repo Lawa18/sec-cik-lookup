@@ -40,35 +40,38 @@ def extract_summary(xbrl_url):
         print(f"❌ ERROR: XML parsing failed: {e}")
         return {}
 
-    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Avoid empty namespace issues
+    # ✅ Extract all available namespaces dynamically
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
+
+    # ✅ Identify available namespace prefixes
+    ns_prefixes = [key for key in namespaces if key in ["us-gaap", "ifrs-full", "dei"]]
 
     def get_value(tag):
         """Extracts financial values using dynamic namespace detection."""
-        possible_tags = [
-        f"{ns_prefix}:{tag}" if ns_prefix else tag,  # Standard tag lookup
-        f"us-gaap:{tag}",  # Check for US GAAP equivalent
-        f"ifrs-full:{tag}",  # Check for IFRS equivalent
-    ]
-    
-    for tag_variant in possible_tags:
-        value = root.xpath(f"//{tag_variant}", namespaces=namespaces)
-        if value:
-            return value[0].text  # Return first match
-    
-    return {
-    "Revenue": get_value("Revenues"),  # IFRS: "Revenue" | US GAAP: "Revenues"
-    "NetIncome": get_value("NetIncomeLoss"),  # IFRS: "ProfitLoss" | US GAAP: "NetIncomeLoss"
-    "TotalAssets": get_value("Assets"),
-    "TotalLiabilities": get_value("Liabilities"),
-    "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
-    "CurrentAssets": get_value("AssetsCurrent"),
-    "CurrentLiabilities": get_value("LiabilitiesCurrent"),
-    "Debt": get_value("LongTermDebtNoncurrent"),  # US GAAP: "LongTermDebtNoncurrent"
-}
+        for ns_prefix in ns_prefixes:
+            xpath_query = f"//{ns_prefix}:{tag}" if ns_prefix else f"//{tag}"
+            value = root.xpath(xpath_query, namespaces=namespaces)
+            if value:
+                return value[0].text  # ✅ Return first match
+        
+        # ✅ If no match found, attempt namespace-independent lookup
+        xpath_query = f"//*[local-name()='{tag}']"
+        value = root.xpath(xpath_query + "/text()", namespaces=namespaces)
+        return value[0] if value else "N/A"
 
-    print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Add debug print
+    financials = {
+        "Revenue": get_value("Revenues"),  # US GAAP: "Revenues" | IFRS: "Revenue"
+        "NetIncome": get_value("NetIncomeLoss"),  # US GAAP: "NetIncomeLoss" | IFRS: "ProfitLoss"
+        "TotalAssets": get_value("Assets"),
+        "TotalLiabilities": get_value("Liabilities"),
+        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
+        "CurrentAssets": get_value("AssetsCurrent"),
+        "CurrentLiabilities": get_value("LiabilitiesCurrent"),
+        "Debt": get_value("LongTermDebtNoncurrent"),  # US GAAP: "LongTermDebtNoncurrent"
+    }
 
+    print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debugging output
     return financials
 
 def extract_xbrl_value(tree, tag, ns=None):
