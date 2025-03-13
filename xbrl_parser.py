@@ -56,18 +56,16 @@ def extract_summary(xbrl_url):
         if value:
             return value[0].text  # Return first match
     
-    return "N/A"  # Default to "N/A" if nothing is found
-
-    financials = {
-        "Revenue": get_value("Revenue"),
-        "NetIncome": get_value("ProfitLoss"),
-        "TotalAssets": get_value("Assets"),
-        "TotalLiabilities": get_value("Liabilities"),
-        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
-        "CurrentAssets": get_value("CurrentAssets"),
-        "CurrentLiabilities": get_value("CurrentLiabilities"),
-        "Debt": get_value("NoncurrentLiabilities"),
-    }
+    return {
+    "Revenue": get_value("Revenues"),  # IFRS: "Revenue" | US GAAP: "Revenues"
+    "NetIncome": get_value("NetIncomeLoss"),  # IFRS: "ProfitLoss" | US GAAP: "NetIncomeLoss"
+    "TotalAssets": get_value("Assets"),
+    "TotalLiabilities": get_value("Liabilities"),
+    "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
+    "CurrentAssets": get_value("AssetsCurrent"),
+    "CurrentLiabilities": get_value("LiabilitiesCurrent"),
+    "Debt": get_value("LongTermDebtNoncurrent"),  # US GAAP: "LongTermDebtNoncurrent"
+}
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Add debug print
 
