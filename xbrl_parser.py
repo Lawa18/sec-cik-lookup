@@ -45,9 +45,18 @@ def extract_summary(xbrl_url):
 
     def get_value(tag):
         """Extracts financial values using dynamic namespace detection."""
-        xpath_query = f"//*[local-name()='{tag}']"
-        value = root.xpath(xpath_query + "/text()", namespaces=namespaces)
-        return value[0] if value else "N/A"
+        possible_tags = [
+        f"{ns_prefix}:{tag}" if ns_prefix else tag,  # Standard tag lookup
+        f"us-gaap:{tag}",  # Check for US GAAP equivalent
+        f"ifrs-full:{tag}",  # Check for IFRS equivalent
+    ]
+    
+    for tag_variant in possible_tags:
+        value = root.xpath(f"//{tag_variant}", namespaces=namespaces)
+        if value:
+            return value[0].text  # Return first match
+    
+    return "N/A"  # Default to "N/A" if nothing is found
 
     financials = {
         "Revenue": get_value("Revenue"),
