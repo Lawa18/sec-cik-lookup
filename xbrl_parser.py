@@ -63,15 +63,35 @@ def extract_summary(xbrl_url):
         print(f"⚠️ WARNING: {tags} not found in XBRL document.")  # Debug when returning "N/A"
         return "N/A"  # Default if no match
 
+    # Extract individual debt components
+    long_term_debt = get_value("LongTermDebtNoncurrent", "LongTermDebt")
+    short_term_debt = get_value("ShortTermDebt", "DebtCurrent")
+
+    # Convert debt values to numbers (if available) and sum them
+    def to_number(value):
+        try:
+            return float(value.replace(",", "")) if value not in ["N/A", None] else 0
+        except ValueError:
+            return 0
+
+    total_debt_value = to_number(long_term_debt) + to_number(short_term_debt)
+    total_debt = str(int(total_debt_value)) if total_debt_value > 0 else "N/A"
+
     financials = {
         "Revenue": get_value("Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue"),  # IFRS & US GAAP variations
         "NetIncome": get_value("NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"),  # Profit/Loss variations
         "TotalAssets": get_value("Assets"),
         "TotalLiabilities": get_value("Liabilities"),
-        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities", "NetCashProvidedByUsedInOperatingActivities"),
+        "OperatingCashFlow": get_value(
+            "CashFlowsFromOperatingActivities",
+            "NetCashProvidedByUsedInOperatingActivities",
+            "CashGeneratedFromOperations",
+            "NetCashFlowsOperating"
+        ),  # Expanded to more variations
         "CurrentAssets": get_value("AssetsCurrent", "CurrentAssets"),
         "CurrentLiabilities": get_value("LiabilitiesCurrent", "CurrentLiabilities"),
-        "Debt": get_value("LongTermDebtNoncurrent", "DebtCurrent", "ShortTermDebt", "TotalDebt")  # Added more variations
+        "Debt": total_debt,  # Summed from Long-Term and Short-Term Debt
+        "TotalDebt": total_debt  # Same as "Debt"
     }
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
