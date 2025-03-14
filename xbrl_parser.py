@@ -54,10 +54,13 @@ def extract_summary(xbrl_url):
             possible_tags.append(tag)  # Add raw tag as last fallback
         
         for tag_variant in possible_tags:
-            value = root.xpath(f"//*[local-name()='{tag_variant}']/text()", namespaces=namespaces)
-            if value:
-                return value[0]  # ✅ Return first match found
+            value_elements = root.xpath(f"//*[local-name()='{tag_variant}']", namespaces=namespaces)
+            if value_elements:
+                text_value = value_elements[0].text
+                if text_value and text_value.strip():
+                    return text_value  # ✅ Return first non-empty value
         
+        print(f"⚠️ WARNING: {tags} not found in XBRL document.")  # Debug when returning "N/A"
         return "N/A"  # Default if no match
 
     financials = {
@@ -66,9 +69,9 @@ def extract_summary(xbrl_url):
         "TotalAssets": get_value("Assets"),
         "TotalLiabilities": get_value("Liabilities"),
         "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities", "NetCashProvidedByUsedInOperatingActivities"),
-        "CurrentAssets": get_value("AssetsCurrent"),
-        "CurrentLiabilities": get_value("LiabilitiesCurrent"),
-        "Debt": get_value("LongTermDebtNoncurrent", "DebtCurrent", "ShortTermDebt")  # Debt variations
+        "CurrentAssets": get_value("AssetsCurrent", "CurrentAssets"),
+        "CurrentLiabilities": get_value("LiabilitiesCurrent", "CurrentLiabilities"),
+        "Debt": get_value("LongTermDebtNoncurrent", "DebtCurrent", "ShortTermDebt", "TotalDebt")  # Added more variations
     }
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
@@ -96,4 +99,3 @@ def extract_xbrl_value(tree, tag, ns=None):
     except Exception as e:
         print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
         return "N/A"
-        
