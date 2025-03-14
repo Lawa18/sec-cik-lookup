@@ -43,12 +43,16 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Avoid empty namespace issues
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    def get_value(tag):
+    def get_value(*tags):
         """Extracts financial values using dynamic namespace detection."""
-        possible_tags = [
-            f"{ns_prefix}:{tag}" if ns_prefix else tag for ns_prefix in namespaces.keys()
-        ] + [tag]  # Add raw tag as last fallback
-    
+        possible_tags = []
+        
+        for tag in tags:
+            possible_tags.extend([
+                f"{ns_prefix}:{tag}" if ns_prefix else tag for ns_prefix in namespaces.keys()
+            ])
+            possible_tags.append(tag)  # Add raw tag as last fallback
+        
         for tag_variant in possible_tags:
             value = root.xpath(f"//*[local-name()='{tag_variant}']/text()", namespaces=namespaces)
             if value:
@@ -57,14 +61,14 @@ def extract_summary(xbrl_url):
         return "N/A"  # Default if no match
 
     financials = {
-        "Revenue": get_value("Revenue"),  # IFRS: "Revenue" | US GAAP: "Revenues"
-        "NetIncome": get_value("NetIncomeLoss"),  # IFRS: "ProfitLoss" | US GAAP: "NetIncomeLoss"
+        "Revenue": get_value("Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue"),  # IFRS & US GAAP variations
+        "NetIncome": get_value("NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"),  # Profit/Loss variations
         "TotalAssets": get_value("Assets"),
         "TotalLiabilities": get_value("Liabilities"),
-        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities"),
+        "OperatingCashFlow": get_value("CashFlowsFromOperatingActivities", "NetCashProvidedByUsedInOperatingActivities"),
         "CurrentAssets": get_value("AssetsCurrent"),
         "CurrentLiabilities": get_value("LiabilitiesCurrent"),
-        "Debt": get_value("LongTermDebtNoncurrent"),  # US GAAP: "LongTermDebtNoncurrent"
+        "Debt": get_value("LongTermDebtNoncurrent", "DebtCurrent", "ShortTermDebt")  # Debt variations
     }
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
@@ -92,3 +96,4 @@ def extract_xbrl_value(tree, tag, ns=None):
     except Exception as e:
         print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
         return "N/A"
+        
