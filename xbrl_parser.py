@@ -5,7 +5,7 @@ from lxml import etree
 def find_xbrl_url(index_url):
     """Finds the XBRL file URL from an SEC index.json."""
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(index_url, headers=headers)
+    response = requests.get(index_url, headers=headers, timeout=5)  # ✅ Add timeout
 
     if response.status_code != 200:
         return None
@@ -28,7 +28,7 @@ def extract_summary(xbrl_url):
         return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(xbrl_url, headers=headers)
+    response = requests.get(xbrl_url, headers=headers, timeout=5)  # ✅ Add timeout
 
     if response.status_code != 200:
         print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
@@ -63,18 +63,21 @@ def extract_summary(xbrl_url):
         print(f"⚠️ WARNING: {tags} not found in XBRL document.")  # Debug when returning "N/A"
         return "N/A"  # Default if no match
 
-    # Extract individual debt components with more variations
-    long_term_debt = get_value("LongTermDebtNoncurrent", "LongTermDebt")
-    short_term_debt = get_value("ShortTermDebt", "DebtCurrent", "CurrentDebt", "ShortDebt", "DebtShortTerm")
+    # Extract debt components with expanded variations
+    long_term_debt = get_value("LongTermDebtNoncurrent", "LongTermDebt", "DebtLongTerm")
+    short_term_debt = get_value("ShortTermDebt", "DebtCurrent", "CurrentDebt", "ShortDebt", "DebtShortTerm", "NotesPayable")
+    total_borrowings = get_value("TotalBorrowings", "TotalDebt")  # Alternative label for total debt
 
-    # Convert debt values to numbers (if available) and sum them
+    # Convert values to numbers and sum them
     def to_number(value):
         try:
             return float(value.replace(",", "")) if value not in ["N/A", None] else 0
         except ValueError:
             return 0
 
-    total_debt_value = to_number(long_term_debt) + to_number(short_term_debt)
+    debt_components = [to_number(long_term_debt), to_number(short_term_debt), to_number(total_borrowings)]
+    total_debt_value = sum(filter(lambda x: x > 0, debt_components))  # Sum only valid values
+
     total_debt = str(int(total_debt_value)) if total_debt_value > 0 else "N/A"
 
     financials = {
