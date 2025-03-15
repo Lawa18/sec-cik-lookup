@@ -63,9 +63,9 @@ def extract_summary(xbrl_url):
         print(f"⚠️ WARNING: {tags} not found in XBRL document.")  # Debug when returning "N/A"
         return "N/A"  # Default if no match
 
-    # Extract individual debt components
+    # Extract individual debt components with more variations
     long_term_debt = get_value("LongTermDebtNoncurrent", "LongTermDebt")
-    short_term_debt = get_value("ShortTermDebt", "DebtCurrent")
+    short_term_debt = get_value("ShortTermDebt", "DebtCurrent", "CurrentDebt", "ShortDebt", "DebtShortTerm")
 
     # Convert debt values to numbers (if available) and sum them
     def to_number(value):
