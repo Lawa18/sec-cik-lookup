@@ -22,34 +22,31 @@ def find_xbrl_url(index_url):
     return None  # No XBRL file found
 
 def extract_summary(xbrl_url):
-    """Parses XBRL data to extract key financial metrics using efficient parsing."""
+    """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url or "XBRL file not found" in xbrl_url:
         print(f"❌ ERROR: Invalid XBRL URL: {xbrl_url}")
         return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(xbrl_url, headers=headers, timeout=5)  # ✅ Shorter timeout
+    response = requests.get(xbrl_url, headers=headers, timeout=5)  # ✅ Prevent long waits
 
     if response.status_code != 200:
         print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
         return {}
 
     try:
-        context = etree.iterparse(response.content, events=("end",), tag="us-gaap:*")  # ✅ Optimized XML parsing
+        root = etree.fromstring(response.content)  # ✅ FIX: Proper XML Parsing
     except etree.XMLSyntaxError as e:
         print(f"❌ ERROR: XML parsing failed: {e}")
         return {}
 
-    financials = {}
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Avoid empty namespace issues
+    print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Relevant Debt Definitions (ONLY IMPORTANT ONES)
-    long_term_debt_tags = ["LongTermDebtNoncurrent", "LongTermDebt"]
-    short_term_debt_tags = ["NotesPayableCurrent", "ShortTermBorrowings"]
-
-    # ✅ Map Alternative Names for US GAAP & IFRS
+    # ✅ Define mappings for key financial metrics (US GAAP & IFRS variations)
     key_mappings = {
         "Revenue": ["Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue"],
-        "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
+        "NetIncome": ["NetIncomeLoss", "ProfitLoss"],
         "TotalAssets": ["Assets"],
         "TotalLiabilities": ["Liabilities"],
         "OperatingCashFlow": [
@@ -62,39 +59,33 @@ def extract_summary(xbrl_url):
         "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"]
     }
 
-    # ✅ Initialize Debt Components
-    long_term_debt = 0
-    short_term_debt = 0
+    # ✅ Debt calculation components
+    debt_tags = ["LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings", "NotesPayableCurrent"]
+    total_debt = 0
 
-    for event, elem in context:
-        tag_name = etree.QName(elem).localname  # ✅ Extract local name
-        value = elem.text.strip() if elem.text else "N/A"
+    # ✅ Extract financials
+    financials = {}
+    for key, tags in key_mappings.items():
+        for tag in tags:
+            value = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+            if value:
+                financials[key] = value[0].replace(",", "")
+                break  # ✅ Stop at first match
 
-        for key, tags in key_mappings.items():
-            if tag_name in tags:
-                financials[key] = value
-
-        if tag_name in long_term_debt_tags:
+    # ✅ Calculate Debt (Sum all relevant debt-related tags)
+    for tag in debt_tags:
+        value = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        if value:
             try:
-                long_term_debt += float(value.replace(",", ""))
+                total_debt += float(value[0].replace(",", ""))
             except ValueError:
                 pass
 
-        if tag_name in short_term_debt_tags:
-            try:
-                short_term_debt += float(value.replace(",", ""))
-            except ValueError:
-                pass
-
-        elem.clear()  # ✅ Free memory
-
-    # ✅ Final Debt Calculation
-    total_debt = long_term_debt + short_term_debt
+    # ✅ Assign final debt values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
-    financials["TotalDebt"] = financials["Debt"]  # ✅ Keep TotalDebt the same
+    financials["TotalDebt"] = financials["Debt"]
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
-
     return financials
 
 def extract_xbrl_value(tree, tag, ns=None):
@@ -103,10 +94,9 @@ def extract_xbrl_value(tree, tag, ns=None):
         if ns is None:
             ns = {}
 
-        # ✅ Use namespace-independent lookup if needed
         xpath_query = f"//*[local-name()='{tag}']"
         value = tree.xpath(xpath_query + "/text()", namespaces=ns)
-        
+
         if value:
             extracted_value = value[0]
             print(f"✅ DEBUG: Found {tag}: {extracted_value}")
