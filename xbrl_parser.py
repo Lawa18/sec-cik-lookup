@@ -59,9 +59,14 @@ def extract_summary(xbrl_url):
         "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"]
     }
 
-    # ✅ Debt calculation components
-    debt_tags = ["LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings", "NotesPayableCurrent"]
-    total_debt = 0
+    # ✅ Expanded Debt Extraction (More Coverage)
+    debt_tags = [
+        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
+        "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
+        "Borrowings", "LoansPayable"
+    ]
+    
+    total_debt = 0  # ✅ Initialize debt sum
 
     # ✅ Extract financials
     financials = {}
@@ -83,7 +88,6 @@ def extract_summary(xbrl_url):
 
     # ✅ Assign final debt values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
-    financials["TotalDebt"] = financials["Debt"]
 
     print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
     return financials
