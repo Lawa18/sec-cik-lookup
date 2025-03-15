@@ -59,11 +59,13 @@ def extract_summary(xbrl_url):
         "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"]
     }
 
-    # ✅ Expanded Debt Extraction (More Coverage)
+    # ✅ **Expanded Debt Extraction (Covers IFRS & US GAAP)**
     debt_tags = [
         "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
         "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
-        "Borrowings", "LoansPayable"
+        "Borrowings", "LoansPayable", "DebtSecurities",
+        "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
+        "ConvertibleDebt", "InterestBearingLoans"
     ]
     
     total_debt = 0  # ✅ Initialize debt sum
