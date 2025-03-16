@@ -28,7 +28,7 @@ def extract_summary(xbrl_url):
         return {}
 
     headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(xbrl_url, headers=headers, timeout=5)  # ✅ Prevent long waits
+    response = requests.get(xbrl_url, headers=headers, timeout=5)
 
     if response.status_code != 200:
         print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
@@ -44,32 +44,32 @@ def extract_summary(xbrl_url):
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
     # ✅ Define mappings for key financial metrics (US GAAP & IFRS variations)
-key_mappings = {
-    "Revenue": [
-        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-        "OperatingRevenue", "OperatingRevenues",  
-        "Turnover", "GrossRevenue",
-        "TotalNetSales", "TotalNetRevenues"  # ✅ Add Apple's label
-    ],
-    "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
-    "TotalAssets": ["Assets"],
-    "TotalLiabilities": ["Liabilities"],
-    "OperatingCashFlow": [
-        "CashFlowsFromOperatingActivities",
-        "NetCashProvidedByUsedInOperatingActivities",
-        "CashGeneratedFromOperations",
-        "NetCashFlowsOperating"
-    ],
-    "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
-    "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
-    "CashAndEquivalents": [  # ✅ Correct tag for cash position
-        "CashAndCashEquivalentsAtCarryingValue",
-        "CashAndCashEquivalents",
-        "CashCashEquivalentsAndShortTermInvestments",
-        "CashAndShortTermInvestments",
-        "CashEquivalents"
-    ]
-}
+    key_mappings = {
+        "Revenue": [
+            "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
+            "OperatingRevenue", "OperatingRevenues",  
+            "Turnover", "GrossRevenue",
+            "TotalNetSales", "TotalNetRevenues"  # ✅ Add Apple's label
+        ],
+        "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
+        "TotalAssets": ["Assets"],
+        "TotalLiabilities": ["Liabilities"],
+        "OperatingCashFlow": [
+            "CashFlowsFromOperatingActivities",
+            "NetCashProvidedByUsedInOperatingActivities",
+            "CashGeneratedFromOperations",
+            "NetCashFlowsOperating"
+        ],
+        "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
+        "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
+        "CashAndEquivalents": [  # ✅ Correct tag for cash position
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashAndCashEquivalents",
+            "CashCashEquivalentsAndShortTermInvestments",
+            "CashAndShortTermInvestments",
+            "CashEquivalents"
+        ]
+    }
 
     # ✅ **Expanded Debt Extraction (Covers IFRS & US GAAP)**
     debt_tags = [
@@ -103,26 +103,4 @@ key_mappings = {
     # ✅ Assign final debt values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
-    print(f"✅ DEBUG: Extracted financials: {financials}")  # ✅ Debug print
-    return financials
-
-def extract_xbrl_value(tree, tag, ns=None):
-    """Extracts the value of a specific XBRL financial tag using namespace handling."""
-    try:
-        if ns is None:
-            ns = {}
-
-        xpath_query = f"//*[local-name()='{tag}']"
-        value = tree.xpath(xpath_query + "/text()", namespaces=ns)
-
-        if value:
-            extracted_value = value[0]
-            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
-            return extracted_value
-        else:
-            print(f"⚠️ WARNING: {tag} not found in XBRL document.")
-            return "N/A"
-
-    except Exception as e:
-        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
-        return "N/A"
+    print(f"✅ DEBUG: Extracted financials
