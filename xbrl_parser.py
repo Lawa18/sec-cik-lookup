@@ -103,4 +103,28 @@ def extract_summary(xbrl_url):
     # ✅ Assign final debt values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
-    print(f"✅ DEBUG: Extracted financials
+    # ✅ **Fixed Debug Print Statement**
+    print(f"✅ DEBUG: Extracted financials: {json.dumps(financials, indent=2)}")  # ✅ Fixing unterminated f-string
+
+    return financials
+
+def extract_xbrl_value(tree, tag, ns=None):
+    """Extracts the value of a specific XBRL financial tag using namespace handling."""
+    try:
+        if ns is None:
+            ns = {}
+
+        xpath_query = f"//*[local-name()='{tag}']"
+        value = tree.xpath(xpath_query + "/text()", namespaces=ns)
+
+        if value:
+            extracted_value = value[0]
+            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
+            return extracted_value
+        else:
+            print(f"⚠️ WARNING: {tag} not found in XBRL document.")
+            return "N/A"
+
+    except Exception as e:
+        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
+        return "N/A"
