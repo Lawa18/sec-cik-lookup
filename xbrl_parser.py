@@ -44,20 +44,32 @@ def extract_summary(xbrl_url):
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
     # ✅ Define mappings for key financial metrics (US GAAP & IFRS variations)
-    key_mappings = {
-        "Revenue": ["Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue"],
-        "NetIncome": ["NetIncomeLoss", "ProfitLoss"],
-        "TotalAssets": ["Assets"],
-        "TotalLiabilities": ["Liabilities"],
-        "OperatingCashFlow": [
-            "CashFlowsFromOperatingActivities",
-            "NetCashProvidedByUsedInOperatingActivities",
-            "CashGeneratedFromOperations",
-            "NetCashFlowsOperating"
-        ],
-        "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
-        "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"]
-    }
+key_mappings = {
+    "Revenue": [
+        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
+        "OperatingRevenue", "OperatingRevenues",  
+        "Turnover", "GrossRevenue",
+        "TotalNetSales", "TotalNetRevenues"  # ✅ Add Apple's label
+    ],
+    "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
+    "TotalAssets": ["Assets"],
+    "TotalLiabilities": ["Liabilities"],
+    "OperatingCashFlow": [
+        "CashFlowsFromOperatingActivities",
+        "NetCashProvidedByUsedInOperatingActivities",
+        "CashGeneratedFromOperations",
+        "NetCashFlowsOperating"
+    ],
+    "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
+    "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
+    "CashAndEquivalents": [  # ✅ Correct tag for cash position
+        "CashAndCashEquivalentsAtCarryingValue",
+        "CashAndCashEquivalents",
+        "CashCashEquivalentsAndShortTermInvestments",
+        "CashAndShortTermInvestments",
+        "CashEquivalents"
+    ]
+}
 
     # ✅ **Expanded Debt Extraction (Covers IFRS & US GAAP)**
     debt_tags = [
