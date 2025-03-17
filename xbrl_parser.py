@@ -1,12 +1,22 @@
 import requests
+import time
 import json
 from lxml import etree
 
+# ✅ SEC API Rate Limit (~8-10 requests/sec)
+REQUEST_DELAY = 0.5  # 500ms delay per request
+MAX_RETRIES = 3  # Retry up to 3 times if request fails
+RETRY_DELAY = 3  # Wait 3 sec before retrying failed requests
+
+# ✅ Standard Headers
+HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+
+# 🔹 STEP 1: FIND XBRL URL
 def find_xbrl_url(index_url):
     """Finds the XBRL file URL from an SEC index.json."""
-    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(index_url, headers=headers, timeout=5)  # ✅ Prevent long waits
+    time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
 
+    response = requests.get(index_url, headers=HEADERS, timeout=5)
     if response.status_code != 200:
         return None
 
@@ -21,35 +31,54 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
+# 🔹 STEP 2: FETCH DATA WITH RETRIES
+def fetch_with_retries(url):
+    """Fetches data from the SEC API with retries."""
+    for attempt in range(MAX_RETRIES):
+        response = requests.get(url, headers=HEADERS, timeout=5)
+
+        if response.status_code == 200:
+            return response.json()  # ✅ Success
+        elif response.status_code == 403:
+            print(f"⚠️ WARNING: SEC API rate limit hit. Retrying in {RETRY_DELAY} sec...")
+        elif response.status_code == 500:
+            print(f"❌ ERROR: SEC API is down. Retrying in {RETRY_DELAY} sec...")
+
+        time.sleep(RETRY_DELAY)  # ✅ Wait before retrying
+
+    print("❌ ERROR: SEC API failed after multiple attempts.")
+    return None  # Return None if all attempts fail
+
+# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
-    if not xbrl_url or "XBRL file not found" in xbrl_url:
+    if not xbrl_url:
         print(f"❌ ERROR: Invalid XBRL URL: {xbrl_url}")
         return {}
 
-    headers = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-    response = requests.get(xbrl_url, headers=headers, timeout=5)
+    time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
+    response = requests.get(xbrl_url, headers=HEADERS, timeout=5)
 
     if response.status_code != 200:
         print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
         return {}
 
     try:
-        root = etree.fromstring(response.content)  # ✅ FIX: Proper XML Parsing
+        root = etree.fromstring(response.content)  # ✅ Proper XML Parsing
     except etree.XMLSyntaxError as e:
         print(f"❌ ERROR: XML parsing failed: {e}")
         return {}
 
-    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Avoid empty namespace issues
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Handle empty namespaces
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Define mappings for key financial metrics (US GAAP & IFRS variations)
+    # ✅ Key Mappings for US GAAP & IFRS
     key_mappings = {
         "Revenue": [
             "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-            "OperatingRevenue", "OperatingRevenues",  
+            "OperatingRevenue", "OperatingRevenues",
             "Turnover", "GrossRevenue",
-            "TotalNetSales", "TotalNetRevenues"  # ✅ Add Apple's label
+            "TotalNetSales", "TotalNetRevenues"  # ✅ Apple's label for Revenue
         ],
         "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
         "TotalAssets": ["Assets"],
@@ -62,7 +91,7 @@ def extract_summary(xbrl_url):
         ],
         "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
         "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
-        "CashAndEquivalents": [  # ✅ Correct tag for cash position
+        "CashPosition": [  # ✅ Correct tag for cash position
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "CashCashEquivalentsAndShortTermInvestments",
@@ -71,18 +100,7 @@ def extract_summary(xbrl_url):
         ]
     }
 
-    # ✅ **Expanded Debt Extraction (Covers IFRS & US GAAP)**
-    debt_tags = [
-        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
-        "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
-        "Borrowings", "LoansPayable", "DebtSecurities",
-        "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
-        "ConvertibleDebt", "InterestBearingLoans"
-    ]
-    
-    total_debt = 0  # ✅ Initialize debt sum
-
-    # ✅ Extract financials
+    # ✅ Extract Financial Data
     financials = {}
     for key, tags in key_mappings.items():
         for tag in tags:
@@ -91,7 +109,16 @@ def extract_summary(xbrl_url):
                 financials[key] = value[0].replace(",", "")
                 break  # ✅ Stop at first match
 
-    # ✅ Calculate Debt (Sum all relevant debt-related tags)
+    # ✅ Debt Extraction (Sum all debt-related tags)
+    debt_tags = [
+        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
+        "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
+        "Borrowings", "LoansPayable", "DebtSecurities",
+        "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
+        "ConvertibleDebt", "InterestBearingLoans"
+    ]
+    
+    total_debt = 0
     for tag in debt_tags:
         value = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
         if value:
@@ -100,14 +127,28 @@ def extract_summary(xbrl_url):
             except ValueError:
                 pass
 
-    # ✅ Assign final debt values
+    # ✅ Assign Final Debt Values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
-    # ✅ **Fixed Debug Print Statement**
-    print(f"✅ DEBUG: Extracted financials: {json.dumps(financials, indent=2)}")  # ✅ Fixing unterminated f-string
-
+    print(f"✅ DEBUG: Extracted financials: {financials}")
     return financials
 
+# 🔹 STEP 4: FETCH SEC FINANCIALS
+def get_sec_financials(cik):
+    """Fetches SEC financial data and handles failures gracefully."""
+    sec_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/index.json"
+    
+    data = fetch_with_retries(sec_url)
+    if data is None:
+        return {"error": "SEC data is temporarily unavailable. Please try again in a few minutes."}
+
+    xbrl_url = find_xbrl_url(sec_url)
+    if not xbrl_url:
+        return {"error": "XBRL file not found. The company may not have submitted structured data."}
+
+    return extract_summary(xbrl_url)
+
+# 🔹 STEP 5: XBRL VALUE EXTRACTION HELPER
 def extract_xbrl_value(tree, tag, ns=None):
     """Extracts the value of a specific XBRL financial tag using namespace handling."""
     try:
