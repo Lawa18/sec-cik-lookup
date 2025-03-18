@@ -72,13 +72,13 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Handle empty namespaces
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Identify Correct Namespace Prefix (Fallback to 'us-gaap' or Custom)
-    ns_prefixes = list(namespaces.keys())
-    default_prefix = "us-gaap"
-    for prefix in ns_prefixes:
-        if prefix and prefix not in ["xsi", "xbrldi", "xlink", "iso4217"]:
-            default_prefix = prefix
-            break
+    # ✅ Identify the correct namespace prefix dynamically
+    possible_prefixes = list(namespaces.keys())
+    ns_prefix = "us-gaap"  # Default to US GAAP
+    for prefix in possible_prefixes:
+        if prefix and prefix not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]:
+            ns_prefix = prefix
+            break  # ✅ Use the first valid namespace found
 
     # ✅ Key Mappings for US GAAP & IFRS
     key_mappings = {
@@ -113,16 +113,16 @@ def extract_summary(xbrl_url):
     financials = {}
     for key, tags in key_mappings.items():
         for tag in tags:
-            full_tag = f"{default_prefix}:{tag}" if default_prefix else tag
-            values = root.xpath(f"//*[local-name()='{full_tag}']/text()", namespaces=namespaces)
+            full_tag = f"{ns_prefix}:{tag}" if ns_prefix else tag
+            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             if values:
                 financials[key] = values[-1].replace(",", "")  # ✅ Take last value (most recent)
                 break  # ✅ Stop at first match
 
-    # ✅ Debugging: Print Detected Revenue Tags if Missing
+    # ✅ Debugging: Print Available Tags if Revenue is Missing
     if "Revenue" not in financials:
-        all_tags = [etree.QName(el).localname for el in root.iter()]
-        print(f"⚠️ WARNING: Revenue missing! Available tags: {set(all_tags)}")
+        all_tags = {etree.QName(el).localname for el in root.iter()}
+        print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
 
     # ✅ Assign Final Debt Values
     financials["Debt"] = str(int(sum([
