@@ -89,15 +89,20 @@ def extract_summary(xbrl_url):
         all_tags = {etree.QName(el).localname for el in root.iter()}
         print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
 
-    # ✅ Compute Debt
+    # ✅ Compute Debt (Fixed UnboundLocalError)
     debt_tags = [
         "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
         "NotesPayableCurrent", "DebtInstrument", "DebtObligations"
     ]
-    total_debt = sum([
-        float(value[0].replace(",", "")) for tag in debt_tags
-        if (value := root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces))
-    ]) if any(root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)) else 0
+    
+    total_debt = 0
+    for tag in debt_tags:
+        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        if values:
+            try:
+                total_debt += float(values[0].replace(",", ""))
+            except ValueError:
+                pass
 
     # ✅ Extract Other Financials
     key_mappings = {
