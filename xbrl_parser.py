@@ -78,7 +78,8 @@ def extract_summary(xbrl_url):
             "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
             "OperatingRevenue", "OperatingRevenues",
             "Turnover", "GrossRevenue",
-            "TotalNetSales", "TotalNetRevenues"  # ✅ Apple's label for Revenue
+            "TotalNetSales", "TotalNetRevenues",  # ✅ Apple's label for Revenue
+            "RevenuesFromContractsWithCustomers"  # ✅ Added for Airbnb
         ],
         "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
         "TotalAssets": ["Assets"],
@@ -129,6 +130,10 @@ def extract_summary(xbrl_url):
 
     # ✅ Assign Final Debt Values
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
+
+    # ✅ Debugging Logs for Missing Revenue
+    if financials.get("Revenue") == "N/A":
+        print(f"⚠️ WARNING: Revenue not found for {xbrl_url}. Possible label mismatch.")
 
     print(f"✅ DEBUG: Extracted financials: {financials}")
     return financials
