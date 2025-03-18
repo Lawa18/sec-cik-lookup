@@ -72,16 +72,24 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Get all available namespace prefixes (ignoring irrelevant ones)
+    # ✅ Get all available namespace prefixes (excluding irrelevant ones)
     possible_prefixes = list(namespaces.keys())
     ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
 
-    # ✅ Force a direct search for "Revenue" in all namespaces
+    # ✅ Search for "Revenue" using all possible namespace prefixes
+    revenue_tags = [
+        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
+        "OperatingRevenue", "TotalNetSales"  # ✅ Apple's label for Revenue
+    ]
+
     revenue_value = None
     for ns in ns_prefixes:
-        values = root.xpath(f"//*[local-name()='Revenue']/text()", namespaces=namespaces)
-        if values:
-            revenue_value = values[-1].replace(",", "")
+        for tag in revenue_tags:
+            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+            if values:
+                revenue_value = values[-1].replace(",", "")
+                break
+        if revenue_value:
             break
 
     # ✅ Debugging: Print Available Tags if Revenue is Missing
@@ -89,7 +97,7 @@ def extract_summary(xbrl_url):
         all_tags = {etree.QName(el).localname for el in root.iter()}
         print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
 
-    # ✅ Compute Debt (Fixed UnboundLocalError)
+    # ✅ Compute Debt
     debt_tags = [
         "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
         "NotesPayableCurrent", "DebtInstrument", "DebtObligations"
