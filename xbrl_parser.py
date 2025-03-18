@@ -72,29 +72,20 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Identify the correct namespace dynamically
+    # ✅ Get all available namespace prefixes (ignoring irrelevant ones)
     possible_prefixes = list(namespaces.keys())
     ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
 
-    # ✅ Search Revenue across ALL detected namespaces
-    revenue_tags = [
-        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-        "OperatingRevenue", "OperatingRevenues", "TotalNetSales",
-        "RevenuesFromContractsWithCustomers"
-    ]
-
-    financials = {}
+    # ✅ Force a direct search for "Revenue" in all namespaces
+    revenue_value = None
     for ns in ns_prefixes:
-        for tag in revenue_tags:
-            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-            if values:
-                financials["Revenue"] = values[-1].replace(",", "")
-                break
-        if "Revenue" in financials:
-            break  # ✅ Stop if we found it
+        values = root.xpath(f"//*[local-name()='Revenue']/text()", namespaces=namespaces)
+        if values:
+            revenue_value = values[-1].replace(",", "")
+            break
 
     # ✅ Debugging: Print Available Tags if Revenue is Missing
-    if "Revenue" not in financials:
+    if not revenue_value:
         all_tags = {etree.QName(el).localname for el in root.iter()}
         print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
 
@@ -108,6 +99,39 @@ def extract_summary(xbrl_url):
         if (value := root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces))
     ]) if any(root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)) else 0
 
+    # ✅ Extract Other Financials
+    key_mappings = {
+        "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
+        "TotalAssets": ["Assets"],
+        "TotalLiabilities": ["Liabilities"],
+        "OperatingCashFlow": [
+            "CashFlowsFromOperatingActivities",
+            "NetCashProvidedByUsedInOperatingActivities",
+            "CashGeneratedFromOperations",
+            "NetCashFlowsOperating"
+        ],
+        "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
+        "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
+        "CashPosition": [
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashAndCashEquivalents",
+            "CashCashEquivalentsAndShortTermInvestments",
+            "CashAndShortTermInvestments",
+            "CashEquivalents"
+        ]
+    }
+
+    financials = {"Revenue": revenue_value if revenue_value else "N/A"}
+
+    # ✅ Extract Other Key Financials
+    for key, tags in key_mappings.items():
+        for tag in tags:
+            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+            if values:
+                financials[key] = values[-1].replace(",", "")
+                break  # ✅ Stop at first match
+
+    # ✅ Assign Debt Value
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     print(f"✅ DEBUG: Extracted financials: {financials}")
