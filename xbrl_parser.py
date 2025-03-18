@@ -69,86 +69,46 @@ def extract_summary(xbrl_url):
         print(f"❌ ERROR: XML parsing failed: {e}")
         return {}
 
-    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Handle empty namespaces
+    namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Identify the correct namespace prefix dynamically
+    # ✅ Identify the correct namespace dynamically
     possible_prefixes = list(namespaces.keys())
-    ns_prefix = "us-gaap"  # Default to US GAAP
-    for prefix in possible_prefixes:
-        if prefix and prefix not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]:
-            ns_prefix = prefix
-            break  # ✅ Use the first valid namespace found
+    ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
 
-    # ✅ Key Mappings for US GAAP & IFRS
-    key_mappings = {
-        "Revenue": [
-            "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-            "OperatingRevenue", "OperatingRevenues",
-            "Turnover", "GrossRevenue",
-            "TotalNetSales", "TotalNetRevenues",
-            "RevenuesFromContractsWithCustomers"  # ✅ Expanded for Airbnb
-        ],
-        "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
-        "TotalAssets": ["Assets"],
-        "TotalLiabilities": ["Liabilities"],
-        "OperatingCashFlow": [
-            "CashFlowsFromOperatingActivities",
-            "NetCashProvidedByUsedInOperatingActivities",
-            "CashGeneratedFromOperations",
-            "NetCashFlowsOperating"
-        ],
-        "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
-        "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
-        "CashPosition": [  
-            "CashAndCashEquivalentsAtCarryingValue",
-            "CashAndCashEquivalents",
-            "CashCashEquivalentsAndShortTermInvestments",
-            "CashAndShortTermInvestments",
-            "CashEquivalents"
-        ]
-    }
+    # ✅ Search Revenue across ALL detected namespaces
+    revenue_tags = [
+        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
+        "OperatingRevenue", "OperatingRevenues", "TotalNetSales",
+        "RevenuesFromContractsWithCustomers"
+    ]
 
-    # ✅ Extract Financial Data
     financials = {}
-    for key, tags in key_mappings.items():
-        for tag in tags:
-            full_tag = f"{ns_prefix}:{tag}" if ns_prefix else tag
+    for ns in ns_prefixes:
+        for tag in revenue_tags:
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             if values:
-                financials[key] = values[-1].replace(",", "")  # ✅ Take last value (most recent)
-                break  # ✅ Stop at first match
+                financials["Revenue"] = values[-1].replace(",", "")
+                break
+        if "Revenue" in financials:
+            break  # ✅ Stop if we found it
 
     # ✅ Debugging: Print Available Tags if Revenue is Missing
     if "Revenue" not in financials:
         all_tags = {etree.QName(el).localname for el in root.iter()}
         print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
 
-    # ✅ Assign Final Debt Values
-    financials["Debt"] = str(int(sum([
-        float(value.replace(",", "")) for tag in [
-            "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
-            "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
-            "Borrowings", "LoansPayable", "DebtSecurities",
-            "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
-            "ConvertibleDebt", "InterestBearingLoans"
-        ] if (value := root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces))
-    ]))) if any(root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)) else "N/A"
+    # ✅ Compute Debt
+    debt_tags = [
+        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
+        "NotesPayableCurrent", "DebtInstrument", "DebtObligations"
+    ]
+    total_debt = sum([
+        float(value[0].replace(",", "")) for tag in debt_tags
+        if (value := root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces))
+    ]) if any(root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)) else 0
+
+    financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     print(f"✅ DEBUG: Extracted financials: {financials}")
     return financials
-
-# 🔹 STEP 4: FETCH SEC FINANCIALS
-def get_sec_financials(cik):
-    """Fetches SEC financial data and handles failures gracefully."""
-    sec_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/index.json"
-    
-    data = fetch_with_retries(sec_url)
-    if data is None:
-        return {"error": "SEC data is temporarily unavailable. Please try again in a few minutes."}
-
-    xbrl_url = find_xbrl_url(sec_url)
-    if not xbrl_url:
-        return {"error": "XBRL file not found. The company may not have submitted structured data."}
-
-    return extract_summary(xbrl_url)
