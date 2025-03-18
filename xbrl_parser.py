@@ -72,22 +72,23 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Get all available namespace prefixes (excluding irrelevant ones)
+    # ✅ Get all available namespace prefixes
     possible_prefixes = list(namespaces.keys())
     ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
 
-    # ✅ Search for "Revenue" using all possible namespace prefixes
+    # ✅ **Extract Revenue**
     revenue_tags = [
         "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-        "OperatingRevenue", "TotalNetSales"  # ✅ Apple's label for Revenue
+        "OperatingRevenue", "TotalNetSales"
     ]
 
     revenue_value = None
-    for ns in ns_prefixes:
+    for ns in ns_prefixes + ["us-gaap"]:  # ✅ Always check US GAAP namespace
         for tag in revenue_tags:
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             if values:
                 revenue_value = values[-1].replace(",", "")
+                print(f"✅ DEBUG: Found Revenue: {revenue_value} (Tag: {tag})")
                 break
         if revenue_value:
             break
