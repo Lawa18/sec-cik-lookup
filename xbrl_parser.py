@@ -72,14 +72,22 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  # ✅ Handle empty namespaces
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
+    # ✅ Identify Correct Namespace Prefix (Fallback to 'us-gaap' or Custom)
+    ns_prefixes = list(namespaces.keys())
+    default_prefix = "us-gaap"
+    for prefix in ns_prefixes:
+        if prefix and prefix not in ["xsi", "xbrldi", "xlink", "iso4217"]:
+            default_prefix = prefix
+            break
+
     # ✅ Key Mappings for US GAAP & IFRS
     key_mappings = {
         "Revenue": [
             "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
             "OperatingRevenue", "OperatingRevenues",
             "Turnover", "GrossRevenue",
-            "TotalNetSales", "TotalNetRevenues",  # ✅ Apple's label for Revenue
-            "RevenuesFromContractsWithCustomers"  # ✅ Added for Airbnb
+            "TotalNetSales", "TotalNetRevenues",
+            "RevenuesFromContractsWithCustomers"  # ✅ Expanded for Airbnb
         ],
         "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
         "TotalAssets": ["Assets"],
@@ -92,7 +100,7 @@ def extract_summary(xbrl_url):
         ],
         "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
         "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
-        "CashPosition": [  # ✅ Correct tag for cash position
+        "CashPosition": [  
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "CashCashEquivalentsAndShortTermInvestments",
@@ -105,35 +113,27 @@ def extract_summary(xbrl_url):
     financials = {}
     for key, tags in key_mappings.items():
         for tag in tags:
-            value = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-            if value:
-                financials[key] = value[0].replace(",", "")
+            full_tag = f"{default_prefix}:{tag}" if default_prefix else tag
+            values = root.xpath(f"//*[local-name()='{full_tag}']/text()", namespaces=namespaces)
+            if values:
+                financials[key] = values[-1].replace(",", "")  # ✅ Take last value (most recent)
                 break  # ✅ Stop at first match
 
-    # ✅ Debt Extraction (Sum all debt-related tags)
-    debt_tags = [
-        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
-        "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
-        "Borrowings", "LoansPayable", "DebtSecurities",
-        "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
-        "ConvertibleDebt", "InterestBearingLoans"
-    ]
-    
-    total_debt = 0
-    for tag in debt_tags:
-        value = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        if value:
-            try:
-                total_debt += float(value[0].replace(",", ""))
-            except ValueError:
-                pass
+    # ✅ Debugging: Print Detected Revenue Tags if Missing
+    if "Revenue" not in financials:
+        all_tags = [etree.QName(el).localname for el in root.iter()]
+        print(f"⚠️ WARNING: Revenue missing! Available tags: {set(all_tags)}")
 
     # ✅ Assign Final Debt Values
-    financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
-
-    # ✅ Debugging Logs for Missing Revenue
-    if financials.get("Revenue") == "N/A":
-        print(f"⚠️ WARNING: Revenue not found for {xbrl_url}. Possible label mismatch.")
+    financials["Debt"] = str(int(sum([
+        float(value.replace(",", "")) for tag in [
+            "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
+            "NotesPayableCurrent", "DebtInstrument", "DebtObligations",
+            "Borrowings", "LoansPayable", "DebtSecurities",
+            "DebtAndFinanceLeases", "FinancialLiabilities", "LeaseLiabilities",
+            "ConvertibleDebt", "InterestBearingLoans"
+        ] if (value := root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces))
+    ]))) if any(root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)) else "N/A"
 
     print(f"✅ DEBUG: Extracted financials: {financials}")
     return financials
@@ -152,25 +152,3 @@ def get_sec_financials(cik):
         return {"error": "XBRL file not found. The company may not have submitted structured data."}
 
     return extract_summary(xbrl_url)
-
-# 🔹 STEP 5: XBRL VALUE EXTRACTION HELPER
-def extract_xbrl_value(tree, tag, ns=None):
-    """Extracts the value of a specific XBRL financial tag using namespace handling."""
-    try:
-        if ns is None:
-            ns = {}
-
-        xpath_query = f"//*[local-name()='{tag}']"
-        value = tree.xpath(xpath_query + "/text()", namespaces=ns)
-
-        if value:
-            extracted_value = value[0]
-            print(f"✅ DEBUG: Found {tag}: {extracted_value}")
-            return extracted_value
-        else:
-            print(f"⚠️ WARNING: {tag} not found in XBRL document.")
-            return "N/A"
-
-    except Exception as e:
-        print(f"❌ ERROR: Could not extract {tag}: {str(e)}")
-        return "N/A"
