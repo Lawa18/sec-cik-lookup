@@ -49,7 +49,18 @@ def fetch_with_retries(url):
     print("❌ ERROR: SEC API failed after multiple attempts.")
     return None  # Return None if all attempts fail
 
-# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
+# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY REVENUE TAGS
+def debug_revenue_tags(root):
+    """Prints all available XBRL tags related to Revenue."""
+    available_tags = {etree.QName(elem).localname for elem in root.iter()}
+    revenue_tags = [tag for tag in available_tags if "revenue" in tag.lower()]
+    
+    if revenue_tags:
+        print(f"🔍 DEBUG: Possible Revenue tags found in XBRL: {revenue_tags}")
+    else:
+        print("⚠️ WARNING: No Revenue-related tags found in XBRL.")
+
+# 🔹 STEP 4: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url:
@@ -76,27 +87,16 @@ def extract_summary(xbrl_url):
     possible_prefixes = list(namespaces.keys())
     ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
 
-    # ✅ **Extract Revenue**
-    revenue_tags = [
-        "Revenue", "Revenues", "SalesRevenueNet", "TotalRevenue",
-        "OperatingRevenue", "TotalNetSales"
-    ]
-
+    # ✅ **Extract Revenue (Dynamically Detect Tag)**
     revenue_value = None
-    for ns in ns_prefixes + ["us-gaap"]:  # ✅ Always check US GAAP namespace
-        for tag in revenue_tags:
-            values = root.xpath(f"//*[namespace-uri()='{namespaces.get(ns, '')}'][local-name()='{tag}']/text()", namespaces=namespaces)
-            if values:
-                revenue_value = values[-1].replace(",", "")
-                print(f"✅ DEBUG: Found Revenue: {revenue_value} (Tag: {tag}, Namespace: {ns})")
-                break
-        if revenue_value:
-            break
+    debug_revenue_tags(root)  # ✅ Print all available revenue-related tags
 
-    # ✅ Debugging: Print Available Tags if Revenue is Missing
-    if not revenue_value:
-        all_tags = {etree.QName(el).localname for el in root.iter()}
-        print(f"⚠️ WARNING: Revenue missing! Available tags: {all_tags}")
+    for tag in root.iter():
+        tag_name = etree.QName(tag).localname
+        if "revenue" in tag_name.lower():
+            revenue_value = tag.text.strip() if tag.text else "N/A"
+            print(f"✅ DEBUG: Found Revenue -> {revenue_value} (Tag: {tag_name})")
+            break
 
     # ✅ Compute Debt
     debt_tags = [
