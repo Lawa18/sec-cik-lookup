@@ -85,10 +85,10 @@ def extract_summary(xbrl_url):
     revenue_value = None
     for ns in ns_prefixes + ["us-gaap"]:  # ✅ Always check US GAAP namespace
         for tag in revenue_tags:
-            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+            values = root.xpath(f"//*[namespace-uri()='{namespaces.get(ns, '')}'][local-name()='{tag}']/text()", namespaces=namespaces)
             if values:
                 revenue_value = values[-1].replace(",", "")
-                print(f"✅ DEBUG: Found Revenue: {revenue_value} (Tag: {tag})")
+                print(f"✅ DEBUG: Found Revenue: {revenue_value} (Tag: {tag}, Namespace: {ns})")
                 break
         if revenue_value:
             break
