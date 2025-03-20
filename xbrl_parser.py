@@ -83,11 +83,7 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Get all available namespace prefixes
-    possible_prefixes = list(namespaces.keys())
-    ns_prefixes = [p for p in possible_prefixes if p and p not in ["xsi", "xbrldi", "xlink", "iso4217", "link", "dei"]]
-
-    # ✅ **Extract Revenue (Dynamically Detect Tag)**
+    # ✅ **Extract Revenue (Prioritize Correct Tags)**
     revenue_value = None
     debug_revenue_tags(root)  # ✅ Print all available revenue-related tags
 
@@ -98,10 +94,17 @@ def extract_summary(xbrl_url):
             revenue_candidates[tag_name] = tag.text.strip() if tag.text else "N/A"
 
     # ✅ Print all found Revenue values
-    print(f"🔍 DEBUG: Extracted Revenue Candidates: {revenue_candidates}")
+    print(f"🔍 DEBUG: Extracted Revenue Candidates (Before Filtering): {revenue_candidates}")
 
-    # ✅ Extract most relevant Revenue value
-    revenue_value = revenue_candidates.get("Revenue") or revenue_candidates.get("TotalRevenue") or revenue_candidates.get("SalesRevenueNet")
+    # ✅ Exclude incorrect revenue tags
+    exclude_revenue_tags = {"RevenueFromContractWithCustomerExcludingAssessedTax", "RevenueFromContractWithCustomerPolicyTextBlock"}
+
+    # ✅ Select correct revenue value
+    for tag, value in revenue_candidates.items():
+        if tag not in exclude_revenue_tags and value != "N/A":
+            revenue_value = value
+            print(f"✅ DEBUG: Selected Revenue: {revenue_value} (Tag: {tag})")
+            break
 
     # ✅ Compute Debt
     debt_tags = [
