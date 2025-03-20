@@ -49,16 +49,11 @@ def fetch_with_retries(url):
     print("❌ ERROR: SEC API failed after multiple attempts.")
     return None  # Return None if all attempts fail
 
-# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY REVENUE TAGS
-def debug_revenue_tags(root):
-    """Prints all available XBRL tags related to Revenue."""
+# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY ALL XBRL TAGS
+def debug_all_tags(root):
+    """Prints all available XBRL tags for debugging."""
     available_tags = {etree.QName(elem).localname for elem in root.iter()}
-    revenue_tags = [tag for tag in available_tags if "revenue" in tag.lower()]
-    
-    if revenue_tags:
-        print(f"🔍 DEBUG: Possible Revenue tags found in XBRL: {revenue_tags}")
-    else:
-        print("⚠️ WARNING: No Revenue-related tags found in XBRL.")
+    print(f"🔍 DEBUG: Available XBRL tags in this filing: {available_tags}")
 
 # 🔹 STEP 4: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
@@ -83,10 +78,10 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ **Extract Revenue (Prioritize Correct Tags)**
-    revenue_value = None
-    debug_revenue_tags(root)  # ✅ Print all available revenue-related tags
+    # ✅ Print All Available XBRL Tags for Debugging
+    debug_all_tags(root)
 
+    # ✅ **Extract Revenue (Prioritize Correct Tags)**
     revenue_candidates = {}
     for tag in root.iter():
         tag_name = etree.QName(tag).localname
@@ -94,16 +89,17 @@ def extract_summary(xbrl_url):
             revenue_candidates[tag_name] = tag.text.strip() if tag.text else "N/A"
 
     # ✅ Print all found Revenue values
-    print(f"🔍 DEBUG: Extracted Revenue Candidates (Before Filtering): {revenue_candidates}")
+    print(f"🔍 DEBUG: Extracted Revenue Candidates: {revenue_candidates}")
 
-    # ✅ **Select the correct Revenue value (Check All Namespaces)**
+    # ✅ **Select the correct Revenue value**
     correct_revenue_tags = [
         "Revenue", "TotalRevenue", "SalesRevenueNet",
         "OperatingRevenue", "TotalNetSales"
     ]
 
+    revenue_value = None
     for tag, value in revenue_candidates.items():
-        if tag in correct_revenue_tags and value != "N/A":
+        if tag in correct_revenue_tags and value not in ["N/A", "0"]:
             revenue_value = value
             print(f"✅ DEBUG: Selected Correct Revenue: {revenue_value} (Tag: {tag})")
             break
