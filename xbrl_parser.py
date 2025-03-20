@@ -96,14 +96,16 @@ def extract_summary(xbrl_url):
     # ✅ Print all found Revenue values
     print(f"🔍 DEBUG: Extracted Revenue Candidates (Before Filtering): {revenue_candidates}")
 
-    # ✅ Exclude incorrect revenue tags
-    exclude_revenue_tags = {"RevenueFromContractWithCustomerExcludingAssessedTax", "RevenueFromContractWithCustomerPolicyTextBlock"}
+    # ✅ **Select the correct Revenue value (Check All Namespaces)**
+    correct_revenue_tags = [
+        "Revenue", "TotalRevenue", "SalesRevenueNet",
+        "OperatingRevenue", "TotalNetSales"
+    ]
 
-    # ✅ Select correct revenue value
     for tag, value in revenue_candidates.items():
-        if tag not in exclude_revenue_tags and value != "N/A":
+        if tag in correct_revenue_tags and value != "N/A":
             revenue_value = value
-            print(f"✅ DEBUG: Selected Revenue: {revenue_value} (Tag: {tag})")
+            print(f"✅ DEBUG: Selected Correct Revenue: {revenue_value} (Tag: {tag})")
             break
 
     # ✅ Compute Debt
