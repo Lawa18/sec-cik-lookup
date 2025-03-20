@@ -91,12 +91,17 @@ def extract_summary(xbrl_url):
     revenue_value = None
     debug_revenue_tags(root)  # ✅ Print all available revenue-related tags
 
+    revenue_candidates = {}
     for tag in root.iter():
         tag_name = etree.QName(tag).localname
         if "revenue" in tag_name.lower():
-            revenue_value = tag.text.strip() if tag.text else "N/A"
-            print(f"✅ DEBUG: Found Revenue -> {revenue_value} (Tag: {tag_name})")
-            break
+            revenue_candidates[tag_name] = tag.text.strip() if tag.text else "N/A"
+
+    # ✅ Print all found Revenue values
+    print(f"🔍 DEBUG: Extracted Revenue Candidates: {revenue_candidates}")
+
+    # ✅ Extract most relevant Revenue value
+    revenue_value = revenue_candidates.get("Revenue") or revenue_candidates.get("TotalRevenue") or revenue_candidates.get("SalesRevenueNet")
 
     # ✅ Compute Debt
     debt_tags = [
