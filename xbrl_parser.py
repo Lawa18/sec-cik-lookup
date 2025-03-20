@@ -94,7 +94,8 @@ def extract_summary(xbrl_url):
     # ✅ **Select the correct Revenue value**
     correct_revenue_tags = [
         "Revenue", "TotalRevenue", "SalesRevenueNet",
-        "OperatingRevenue", "TotalNetSales"
+        "OperatingRevenue", "TotalNetSales",
+        "RevenueFromContractWithCustomerExcludingAssessedTax"  # ✅ Airbnb's Revenue Tag
     ]
 
     revenue_value = None
