@@ -49,13 +49,7 @@ def fetch_with_retries(url):
     print("❌ ERROR: SEC API failed after multiple attempts.")
     return None  # Return None if all attempts fail
 
-# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY ALL XBRL TAGS
-def debug_all_tags(root):
-    """Prints all available XBRL tags for debugging."""
-    available_tags = {etree.QName(elem).localname for elem in root.iter()}
-    print(f"🔍 DEBUG: Available XBRL tags in this filing: {available_tags}")
-
-# 🔹 STEP 4: EXTRACT FINANCIAL DATA FROM XBRL
+# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url:
@@ -78,11 +72,10 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
     print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ Print All Available XBRL Tags for Debugging
-    debug_all_tags(root)
-
     # ✅ **Extract Revenue (Prioritize Correct Tags)**
+    revenue_value = None
     revenue_candidates = {}
+
     for tag in root.iter():
         tag_name = etree.QName(tag).localname
         if "revenue" in tag_name.lower():
@@ -98,7 +91,6 @@ def extract_summary(xbrl_url):
         "RevenueFromContractWithCustomerExcludingAssessedTax"  # ✅ Airbnb's Revenue Tag
     ]
 
-    revenue_value = None
     for tag, value in revenue_candidates.items():
         if tag in correct_revenue_tags and value not in ["N/A", "0"]:
             revenue_value = value
