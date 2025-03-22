@@ -39,63 +39,48 @@ def fetch_with_retries(url):
 
         if response.status_code == 200:
             return response.json()  # ✅ Success
-        elif response.status_code == 403:
-            print(f"⚠️ WARNING: SEC API rate limit hit. Retrying in {RETRY_DELAY} sec...")
-        elif response.status_code == 500:
-            print(f"❌ ERROR: SEC API is down. Retrying in {RETRY_DELAY} sec...")
+        elif response.status_code in [403, 500]:
+            time.sleep(RETRY_DELAY)  # ✅ Wait before retrying
+        else:
+            break  # No need to retry on other errors
 
-        time.sleep(RETRY_DELAY)  # ✅ Wait before retrying
-
-    print("❌ ERROR: SEC API failed after multiple attempts.")
-    return None  # Return None if all attempts fail
+    return None if response.status_code != 200 else response.json()
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url:
-        print(f"❌ ERROR: Invalid XBRL URL: {xbrl_url}")
+        print("❌ ERROR: Invalid XBRL URL")
         return {}
 
     time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
     response = requests.get(xbrl_url, headers=HEADERS, timeout=5)
 
     if response.status_code != 200:
-        print(f"❌ ERROR: Failed to fetch XBRL file: {xbrl_url}")
+        print("❌ ERROR: Failed to fetch XBRL file")
         return {}
 
     try:
         root = etree.fromstring(response.content)  # ✅ Proper XML Parsing
-    except etree.XMLSyntaxError as e:
-        print(f"❌ ERROR: XML parsing failed: {e}")
+    except etree.XMLSyntaxError:
+        print("❌ ERROR: XML parsing failed")
         return {}
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
-    print(f"✅ DEBUG: Extracted Namespaces from XBRL: {namespaces}")
 
-    # ✅ **Extract Revenue (Prioritize Correct Tags)**
+    # ✅ **Extract Revenue Efficiently**
     revenue_value = None
-    revenue_candidates = {}
-
-    for tag in root.iter():
-        tag_name = etree.QName(tag).localname
-        if "revenue" in tag_name.lower():
-            revenue_candidates[tag_name] = tag.text.strip() if tag.text else "N/A"
-
-    # ✅ Print all found Revenue values
-    print(f"🔍 DEBUG: Extracted Revenue Candidates: {revenue_candidates}")
-
-    # ✅ **Select the correct Revenue value**
     correct_revenue_tags = [
         "Revenue", "TotalRevenue", "SalesRevenueNet",
         "OperatingRevenue", "TotalNetSales",
-        "RevenueFromContractWithCustomerExcludingAssessedTax"  # ✅ Airbnb's Revenue Tag
+        "RevenueFromContractWithCustomerExcludingAssessedTax"
     ]
 
-    for tag, value in revenue_candidates.items():
-        if tag in correct_revenue_tags and value not in ["N/A", "0"]:
-            revenue_value = value
-            print(f"✅ DEBUG: Selected Correct Revenue: {revenue_value} (Tag: {tag})")
-            break
+    for tag in correct_revenue_tags:
+        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        if values and values[0].strip():
+            revenue_value = values[0].replace(",", "")
+            break  # ✅ Stop at first valid match
 
     # ✅ Compute Debt
     debt_tags = [
@@ -147,5 +132,4 @@ def extract_summary(xbrl_url):
     # ✅ Assign Debt Value
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
-    print(f"✅ DEBUG: Extracted financials: {financials}")
     return financials
