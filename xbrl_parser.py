@@ -20,24 +20,14 @@ def fetch_with_retries(url):
         try:
             response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
             
-            # ✅ SUCCESS: Return JSON data if the request works
             if response.status_code == 200:
                 return response.json()
-            
-            # 🚦 RATE LIMIT HIT: Handle 403 Errors
-            elif response.status_code == 403:
-                print(f"⚠️ WARNING: SEC API rate limit hit. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+            elif response.status_code in [403, 500, 503]:
+                print(f"⚠️ WARNING: SEC API rate limit hit or server issue. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
                 time.sleep(RETRY_DELAY)
-
-            # 🔄 SERVER DOWN: Handle 500/503 Errors
-            elif response.status_code in [500, 503]:
-                print(f"❌ ERROR: SEC API is down. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
-                time.sleep(RETRY_DELAY)
-
-            # 🚨 UNKNOWN ERROR: Log it properly
             else:
                 print(f"❌ ERROR: Unexpected API response ({response.status_code}) - {response.text}")
-                break  # Do not retry unknown errors
+                break
 
         except requests.exceptions.Timeout:
             print(f"⏳ TIMEOUT: SEC API did not respond. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
@@ -53,7 +43,7 @@ def fetch_with_retries(url):
 # 🔹 STEP 2: FIND XBRL URL
 def find_xbrl_url(index_url):
     """Finds the XBRL file URL from an SEC index.json."""
-    time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
+    time.sleep(REQUEST_DELAY)
 
     response = fetch_with_retries(index_url)
     if not response:
@@ -76,7 +66,7 @@ def extract_summary(xbrl_url):
         print("❌ ERROR: Invalid XBRL URL")
         return {}
 
-    time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
+    time.sleep(REQUEST_DELAY)
     response = requests.get(xbrl_url, headers=HEADERS, timeout=TIMEOUT)
 
     if response.status_code != 200:
@@ -84,44 +74,20 @@ def extract_summary(xbrl_url):
         return {}
 
     try:
-        root = etree.fromstring(response.content)  # ✅ Proper XML Parsing
+        root = etree.fromstring(response.content)
     except etree.XMLSyntaxError:
         print("❌ ERROR: XML parsing failed")
         return {}
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Extract Revenue Efficiently**
-    revenue_value = None
-    correct_revenue_tags = [
-        "Revenue", "TotalRevenue", "SalesRevenueNet",
-        "OperatingRevenue", "TotalNetSales",
-        "RevenueFromContractWithCustomerExcludingAssessedTax"
-    ]
-
-    for tag in correct_revenue_tags:
-        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        if values and values[0].strip():
-            revenue_value = values[0].replace(",", "")
-            break  # ✅ Stop at first valid match
-
-    # ✅ Compute Debt
-    debt_tags = [
-        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
-        "NotesPayableCurrent", "DebtInstrument", "DebtObligations"
-    ]
-    
-    total_debt = 0
-    for tag in debt_tags:
-        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        if values:
-            try:
-                total_debt += float(values[0].replace(",", ""))
-            except ValueError:
-                pass
-
-    # ✅ Extract Other Financials
+    # ✅ **Key Mappings**
     key_mappings = {
+        "Revenue": [
+            "Revenue", "TotalRevenue", "SalesRevenueNet",
+            "OperatingRevenue", "TotalNetSales",
+            "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ],
         "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
         "TotalAssets": ["Assets"],
         "TotalLiabilities": ["Liabilities"],
@@ -139,12 +105,21 @@ def extract_summary(xbrl_url):
             "CashCashEquivalentsAndShortTermInvestments",
             "CashAndShortTermInvestments",
             "CashEquivalents"
-        ]
+        ],
+        "Inventory": ["InventoryNet", "Inventories"],
+        "AccountsReceivable": ["AccountsReceivableNet", "ReceivablesNetCurrent"],
+        "CapitalExpenditures": [
+            "PaymentsToAcquirePropertyPlantAndEquipment",
+            "PurchaseOfPropertyPlantAndEquipment"
+        ],
+        "InterestExpense": [
+            "InterestExpense", "InterestAndDebtExpense", "FinanceExpense"
+        ],
+        "IncomeTaxExpense": ["IncomeTaxExpenseBenefit", "ProvisionForIncomeTaxes"]
     }
 
-    financials = {"Revenue": revenue_value if revenue_value else "N/A"}
-
-    # ✅ Extract Other Key Financials
+    # ✅ Extract Key Financials
+    financials = {}
     for key, tags in key_mappings.items():
         for tag in tags:
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
@@ -152,22 +127,41 @@ def extract_summary(xbrl_url):
                 financials[key] = values[-1].replace(",", "")
                 break  # ✅ Stop at first match
 
-    # ✅ Assign Debt Value
+    # ✅ Compute Debt & Extract Maturities
+    debt_tags = [
+        "LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings",
+        "NotesPayableCurrent", "DebtInstrument", "DebtObligations"
+    ]
+    
+    total_debt = 0
+    for tag in debt_tags:
+        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        if values:
+            try:
+                total_debt += float(values[0].replace(",", ""))
+            except ValueError:
+                pass
+
+    # ✅ Extract Debt Maturities (Breakdown by Year)
+    debt_maturities = {}
+    maturity_tags = [
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalRemainderOfFiscalYear",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalYearOne",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalYearTwo",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalYearThree",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalYearFour",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalYearFive",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterFiveYears"
+    ]
+
+    for tag in maturity_tags:
+        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        if values:
+            debt_maturities[tag] = values[0].replace(",", "")
+
+    # ✅ Final Output
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
+    financials["DebtMaturities"] = debt_maturities
 
     return financials
-
-# 🔹 STEP 4: GET SEC FINANCIALS
-def get_sec_financials(cik):
-    """Fetches SEC financial data and handles failures gracefully."""
-    sec_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/index.json"
-    
-    data = fetch_with_retries(sec_url)
-    if data is None:
-        return {"error": "SEC data is temporarily unavailable. Please try again in a few minutes."}
-
-    xbrl_url = find_xbrl_url(sec_url)
-    if not xbrl_url:
-        return {"error": "XBRL file not found. The company may not have submitted structured data."}
-
-    return extract_summary(xbrl_url)
