@@ -15,7 +15,6 @@ HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
 # 🔹 STEP 1: FETCH DATA WITH IMPROVED ERROR HANDLING
 def fetch_with_retries(url):
     """Fetches data from the SEC API with retries & improved error handling."""
-    
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
@@ -59,7 +58,17 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
-# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
+# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY REVENUE AND DEBT TAGS
+def debug_xbrl_tags(root):
+    """Prints all available XBRL tags for debugging."""
+    available_tags = {etree.QName(elem).localname for elem in root.iter()}
+    revenue_tags = [tag for tag in available_tags if "revenue" in tag.lower()]
+    debt_tags = [tag for tag in available_tags if "debt" in tag.lower()]
+    
+    print(f"🔍 DEBUG: Revenue Tags Found: {revenue_tags}")
+    print(f"🔍 DEBUG: Debt Tags Found: {debt_tags}")
+
+# 🔹 STEP 4: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url:
@@ -81,7 +90,10 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Key Mappings**
+    # ✅ Debug Available XBRL Tags
+    debug_xbrl_tags(root)
+
+    # ✅ **Key Mappings for Financial Metrics**
     key_mappings = {
         "Revenue": [
             "Revenue", "TotalRevenue", "SalesRevenueNet",
