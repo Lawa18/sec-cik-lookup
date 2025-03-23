@@ -5,46 +5,69 @@ from lxml import etree
 
 # ✅ SEC API Rate Limit (~8-10 requests/sec)
 REQUEST_DELAY = 0.5  # 500ms delay per request
-MAX_RETRIES = 3  # Retry up to 3 times if request fails
-RETRY_DELAY = 3  # Wait 3 sec before retrying failed requests
+MAX_RETRIES = 5  # Retry up to 5 times if request fails
+RETRY_DELAY = 5  # Wait 5 sec before retrying failed requests
+TIMEOUT = 10  # Increase API timeout
 
 # ✅ Standard Headers
 HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
 
-# 🔹 STEP 1: FIND XBRL URL
+# 🔹 STEP 1: FETCH DATA WITH IMPROVED ERROR HANDLING
+def fetch_with_retries(url):
+    """Fetches data from the SEC API with retries & improved error handling."""
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            
+            # ✅ SUCCESS: Return JSON data if the request works
+            if response.status_code == 200:
+                return response.json()
+            
+            # 🚦 RATE LIMIT HIT: Handle 403 Errors
+            elif response.status_code == 403:
+                print(f"⚠️ WARNING: SEC API rate limit hit. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+                time.sleep(RETRY_DELAY)
+
+            # 🔄 SERVER DOWN: Handle 500/503 Errors
+            elif response.status_code in [500, 503]:
+                print(f"❌ ERROR: SEC API is down. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+                time.sleep(RETRY_DELAY)
+
+            # 🚨 UNKNOWN ERROR: Log it properly
+            else:
+                print(f"❌ ERROR: Unexpected API response ({response.status_code}) - {response.text}")
+                break  # Do not retry unknown errors
+
+        except requests.exceptions.Timeout:
+            print(f"⏳ TIMEOUT: SEC API did not respond. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+            time.sleep(RETRY_DELAY)
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: API request failed ({str(e)}). Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+            time.sleep(RETRY_DELAY)
+
+    print("🚨 FINAL ERROR: SEC API failed after multiple attempts. Please try again later.")
+    return None  # Return None if all attempts fail
+
+# 🔹 STEP 2: FIND XBRL URL
 def find_xbrl_url(index_url):
     """Finds the XBRL file URL from an SEC index.json."""
     time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
 
-    response = requests.get(index_url, headers=HEADERS, timeout=5)
-    if response.status_code != 200:
+    response = fetch_with_retries(index_url)
+    if not response:
         return None
 
     try:
-        data = response.json()
-        if "directory" in data and "item" in data["directory"]:
-            for file in data["directory"]["item"]:
+        if "directory" in response and "item" in response["directory"]:
+            for file in response["directory"]["item"]:
                 if file["name"].endswith(".xml") and "htm.xml" in file["name"]:
                     return index_url.replace("index.json", file["name"])
     except json.JSONDecodeError:
         return None
 
     return None  # No XBRL file found
-
-# 🔹 STEP 2: FETCH DATA WITH RETRIES
-def fetch_with_retries(url):
-    """Fetches data from the SEC API with retries."""
-    for attempt in range(MAX_RETRIES):
-        response = requests.get(url, headers=HEADERS, timeout=5)
-
-        if response.status_code == 200:
-            return response.json()  # ✅ Success
-        elif response.status_code in [403, 500]:
-            time.sleep(RETRY_DELAY)  # ✅ Wait before retrying
-        else:
-            break  # No need to retry on other errors
-
-    return None if response.status_code != 200 else response.json()
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
@@ -54,7 +77,7 @@ def extract_summary(xbrl_url):
         return {}
 
     time.sleep(REQUEST_DELAY)  # ✅ Prevent SEC rate limit issues
-    response = requests.get(xbrl_url, headers=HEADERS, timeout=5)
+    response = requests.get(xbrl_url, headers=HEADERS, timeout=TIMEOUT)
 
     if response.status_code != 200:
         print("❌ ERROR: Failed to fetch XBRL file")
@@ -133,3 +156,18 @@ def extract_summary(xbrl_url):
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     return financials
+
+# 🔹 STEP 4: GET SEC FINANCIALS
+def get_sec_financials(cik):
+    """Fetches SEC financial data and handles failures gracefully."""
+    sec_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/index.json"
+    
+    data = fetch_with_retries(sec_url)
+    if data is None:
+        return {"error": "SEC data is temporarily unavailable. Please try again in a few minutes."}
+
+    xbrl_url = find_xbrl_url(sec_url)
+    if not xbrl_url:
+        return {"error": "XBRL file not found. The company may not have submitted structured data."}
+
+    return extract_summary(xbrl_url)
