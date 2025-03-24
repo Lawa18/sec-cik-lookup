@@ -175,7 +175,6 @@ key_mappings = {
         "DebtInstruments"
     ]
 }
-
     financials = {}
 
     # ✅ Extract key financials
