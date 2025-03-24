@@ -58,41 +58,7 @@ def find_xbrl_url(index_url):
 
     return None  # No XBRL file found
 
-# 🔹 STEP 3: DEBUG FUNCTION TO IDENTIFY ALL RELEVANT FINANCIAL TAGS
-def debug_all_financial_tags(root):
-    """Prints all available XBRL tags related to key financial metrics."""
-    available_tags = {etree.QName(elem).localname for elem in root.iter()}
-    
-    # Define financial categories to look for
-    financial_categories = {
-        "Revenue": "revenue",
-        "Net Income": "income",
-        "Total Assets": "assets",
-        "Total Liabilities": "liabilities",
-        "Operating Cash Flow": "cash",
-        "Current Assets": "current",
-        "Current Liabilities": "current",
-        "Cash Position": "cash",
-        "Inventory": "inventory",
-        "Accounts Receivable": "receivable",
-        "Capital Expenditures": "property",
-        "Interest Expense": "interest",
-        "Income Tax Expense": "tax",
-        "Debt": "debt",
-        "Debt Maturities": "maturities",
-        "EBITDA": "ebitda",
-        "Gross Profit": "gross",
-        "Operating Income": "operating",
-        "Equity": "equity"
-    }
-    
-    # Extract and print matching tags
-    for category, keyword in financial_categories.items():
-        matching_tags = [tag for tag in available_tags if keyword in tag.lower()]
-        if matching_tags:
-            print(f"🔍 DEBUG: {category} Tags Found: {matching_tags}")
-
-# 🔹 STEP 4: EXTRACT FINANCIAL DATA FROM XBRL
+# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Parses XBRL data to extract key financial metrics."""
     if not xbrl_url:
@@ -114,36 +80,84 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ Debug All Available XBRL Tags
-    debug_all_financial_tags(root)
-
-    # ✅ **Key Mappings for Financial Metrics**
+    # ✅ **Key Mappings for Financial Metrics (Updated with IBM & Boeing)**
     key_mappings = {
         "Revenue": [
-            "Revenue", "TotalRevenue", "SalesRevenueNet",
-            "OperatingRevenue", "TotalNetSales",
-            "RevenueFromContractWithCustomerExcludingAssessedTax"
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "Revenues",
+            "RevenueRecognitionPolicyTextBlock",
+            "DisaggregationOfRevenueTableTextBlock",
+            "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
+            "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock"
         ],
-        "NetIncome": ["NetIncomeLoss", "ProfitLoss", "OperatingIncomeLoss"],
-        "TotalAssets": ["Assets"],
-        "TotalLiabilities": ["Liabilities"],
+        "NetIncome": [
+            "NetIncomeLoss",
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
+            "OperatingIncomeLoss",
+            "NetIncomeLossAvailableToCommonStockholdersDiluted"
+        ],
+        "TotalAssets": [
+            "Assets",
+            "TotalAssets",
+            "AssetsFairValueDisclosure",
+            "GrossCustomerFinancingAssets"
+        ],
+        "TotalLiabilities": [
+            "Liabilities",
+            "LiabilitiesAndStockholdersEquity",
+            "LiabilitiesFairValueDisclosure"
+        ],
         "OperatingCashFlow": [
-            "CashFlowsFromOperatingActivities",
             "NetCashProvidedByUsedInOperatingActivities",
-            "CashGeneratedFromOperations",
-            "NetCashFlowsOperating"
+            "CashCashEquivalentsAndShortTermInvestments"
         ],
-        "CurrentAssets": ["AssetsCurrent", "CurrentAssets"],
-        "CurrentLiabilities": ["LiabilitiesCurrent", "CurrentLiabilities"],
-        "CashPosition": ["CashAndCashEquivalentsAtCarryingValue", "CashAndCashEquivalents"],
-        "Inventory": ["InventoryNet", "Inventories"],
-        "AccountsReceivable": ["AccountsReceivableNet", "ReceivablesNetCurrent"],
-        "CapitalExpenditures": ["PaymentsToAcquirePropertyPlantAndEquipment", "PurchaseOfPropertyPlantAndEquipment"],
-        "InterestExpense": ["InterestExpense", "InterestAndDebtExpense", "FinanceExpense"],
-        "IncomeTaxExpense": ["IncomeTaxExpenseBenefit", "ProvisionForIncomeTaxes"],
-        "EBITDA": ["EarningsBeforeInterestTaxesDepreciationAndAmortization"],
-        "GrossProfit": ["GrossProfit"],
-        "OperatingIncome": ["OperatingIncome", "OperatingProfit"]
+        "CurrentAssets": [
+            "AssetsCurrent",
+            "CurrentPortionOfFinancingReceivablesNet",
+            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
+        ],
+        "CurrentLiabilities": [
+            "LiabilitiesCurrent",
+            "AccountsPayableCurrent",
+            "OtherAccruedLiabilitiesCurrent"
+        ],
+        "CashPosition": [
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashAndCashEquivalents",
+            "RestrictedCashAndCashEquivalents"
+        ],
+        "Inventory": [
+            "InventoryNet",
+            "ScheduleOfInventoryCurrentTableTextBlock",
+            "InventoryForLongTermContractsOrPrograms"
+        ],
+        "AccountsReceivable": [
+            "AccountsReceivableNet",
+            "AccountsReceivableGrossCurrent",
+            "UnbilledContractsReceivable"
+        ],
+        "CapitalExpenditures": [
+            "PaymentsToAcquirePropertyPlantAndEquipment",
+            "PropertyPlantAndEquipmentTextBlock",
+            "PropertyPlantAndEquipmentAdditionsNonCash"
+        ],
+        "InterestExpense": [
+            "InterestExpense",
+            "InterestAndDebtExpense",
+            "InterestPaid"
+        ],
+        "IncomeTaxExpense": [
+            "IncomeTaxExpenseBenefit",
+            "DeferredIncomeTaxExpenseBenefit",
+            "EffectiveIncomeTaxRateContinuingOperations"
+        ],
+        "Debt": [
+            "LongTermDebt",
+            "LongTermDebtNoncurrent",
+            "DebtInstrumentCarryingAmount",
+            "LongTermDebtAndCapitalLeaseObligations",
+            "DebtDisclosureTextBlock"
+        ]
     }
 
     # ✅ Extract Key Financials
@@ -156,7 +170,9 @@ def extract_summary(xbrl_url):
                 break  # ✅ Stop at first match
 
     # ✅ Compute Debt & Extract Maturities
-    debt_tags = ["LongTermDebt", "LongTermDebtNoncurrent", "ShortTermBorrowings", "NotesPayableCurrent"]
+    debt_tags = [
+        "LongTermDebt", "LongTermDebtNoncurrent", "DebtInstrumentCarryingAmount"
+    ]
     
     total_debt = 0
     for tag in debt_tags:
@@ -169,14 +185,21 @@ def extract_summary(xbrl_url):
 
     # ✅ Extract Debt Maturities
     debt_maturities = {}
-    maturity_tags = ["LongTermDebtMaturitiesRepaymentsOfPrincipalYearOne", "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterFiveYears"]
-    
+    maturity_tags = [
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive",
+        "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterFiveYears"
+    ]
+
     for tag in maturity_tags:
         values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
         if values:
             debt_maturities[tag] = values[0].replace(",", "")
 
-    # ✅ Final Output
+    # ✅ Assign Debt Maturities
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
     financials["DebtMaturities"] = debt_maturities
 
