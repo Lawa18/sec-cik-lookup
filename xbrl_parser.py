@@ -59,8 +59,8 @@ def find_xbrl_url(index_url):
     return None  # No XBRL file found
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
-def extract_summary(xbrl_url):
-    """Parses XBRL data to extract key financial metrics with improved accuracy."""
+def extract_summary(xbrl_url, filing_type="10-K"):
+    """Parses XBRL data to extract key financial metrics with improved accuracy for quarterly vs. annual filings."""
     
     if not xbrl_url:
         print("❌ ERROR: Invalid XBRL URL")
@@ -81,23 +81,26 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Fully Restored `key_mappings` (Removed Total Liabilities, Added Equity)**
+    # ✅ Fully restored key mappings (adjusted for quarterly reports)
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "Revenues",
-            "RevenueRecognitionPolicyTextBlock",
-            "DisaggregationOfRevenueTableTextBlock",
-            "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
-            "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock",
             "SalesRevenueNet",
-            "Revenue"
+            "Revenue",
+            # 🆕 Quarterly-specific tags (ensuring latest standalone quarter)
+            "RevenueFromContractWithCustomerExcludingAssessedTaxThreeMonths",
+            "ThreeMonthsRevenue",
+            "CurrentQuarterRevenue"
         ],
         "NetIncome": [
             "NetIncomeLoss",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
             "OperatingIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted"
+            "NetIncomeLossAvailableToCommonStockholdersDiluted",
+            # 🆕 Quarterly-specific tags
+            "NetIncomeThreeMonths",
+            "CurrentQuarterNetIncome"
         ],
         "TotalAssets": [
             "Assets",
@@ -111,7 +114,10 @@ def extract_summary(xbrl_url):
             "NetCashProvidedByUsedInOperatingActivities",
             "CashCashEquivalentsAndShortTermInvestments",
             "OperatingActivitiesCashFlowsAbstract",
-            "CashGeneratedByOperatingActivities"
+            "CashGeneratedByOperatingActivities",
+            # 🆕 Quarterly-specific tags
+            "NetCashProvidedByUsedInOperatingActivitiesThreeMonths",
+            "CurrentQuarterCashFlow"
         ],
         "CurrentAssets": [
             "AssetsCurrent",
@@ -186,9 +192,27 @@ def extract_summary(xbrl_url):
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             extracted_values.extend(values)
         
+        # ✅ Handle Quarterly vs. Annual Data
         if extracted_values:
             try:
-                financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
+                # If it's a 10-Q, we prioritize quarterly-specific tags
+                if filing_type == "10-Q":
+                    quarter_tags = [
+                        "ThreeMonthsRevenue", "CurrentQuarterRevenue",
+                        "NetIncomeThreeMonths", "CurrentQuarterNetIncome",
+                        "NetCashProvidedByUsedInOperatingActivitiesThreeMonths", "CurrentQuarterCashFlow"
+                    ]
+                    quarter_values = [float(v.replace(",", "")) for tag in quarter_tags for v in root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces) if v.replace(",", "").replace(".", "").isdigit()]
+                    
+                    # If standalone quarter values exist, use them
+                    if quarter_values:
+                        financials[key] = max(quarter_values)
+                    else:
+                        # Otherwise, fallback to standard extraction
+                        financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
+                else:
+                    # For 10-K (Annual), extract normally
+                    financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
             except ValueError:
                 financials[key] = "N/A"
 
