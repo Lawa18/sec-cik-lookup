@@ -82,69 +82,99 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
     # ✅ **Key Mappings for Financial Metrics (FULLY RETAINED + IMPROVED)**
-    key_mappings = {
-        "Revenue": [
-            "RevenueFromContractWithCustomerExcludingAssessedTax",
-            "Revenues",
-            "SalesRevenueNet",
-            "Revenue"
-        ],
-        "NetIncome": [
-            "NetIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted",
-            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
-        ],
-        "TotalAssets": [
-            "Assets",
-            "TotalAssets",
-            "AssetsFairValueDisclosure",
-            "BalanceSheetAbstract",
-            "StatementOfFinancialPositionAbstract"
-        ],
-        "TotalLiabilities": [
-            "Liabilities",
-            "LiabilitiesAndStockholdersEquity",
-            "LiabilitiesFairValueDisclosure",
-            "TotalLiabilitiesAndEquity"
-        ],
-        "OperatingCashFlow": [
-            "NetCashProvidedByUsedInOperatingActivities",
-            "OperatingActivitiesCashFlowsAbstract",
-            "CashGeneratedByOperatingActivities"
-        ],
-        "CurrentAssets": [
-            "AssetsCurrent",
-            "CurrentAssets",
-            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
-        ],
-        "CurrentLiabilities": [
-            "LiabilitiesCurrent",
-            "CurrentLiabilities",
-            "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent"
-        ],
-        "CashPosition": [
-            "CashAndCashEquivalentsAtCarryingValue",
-            "CashAndCashEquivalents",
-            "RestrictedCashAndCashEquivalents",
-            "CashAndShortTermInvestments"
-        ],
-        "Debt": [
-            "LongTermDebt",
-            "LongTermDebtNoncurrent",
-            "DebtInstrumentCarryingAmount",
-            "LongTermDebtAndCapitalLeaseObligations",
-            "DebtDisclosureTextBlock",
-            "DebtCurrent",
-            "NotesPayable"
-        ],
-        "Equity": [
-            "StockholdersEquity",
-            "Equity",
-            "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit"
-        ]
-    }
+key_mappings = {
+    "Revenue": [
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "Revenues",
+        "RevenueRecognitionPolicyTextBlock",
+        "DisaggregationOfRevenueTableTextBlock",
+        "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
+        "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock",
+        "SalesRevenueNet",
+        "Revenue"
+    ],
+    "NetIncome": [
+        "NetIncomeLoss",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
+        "OperatingIncomeLoss",
+        "NetIncomeLossAvailableToCommonStockholdersDiluted"
+    ],
+    "TotalAssets": [
+        "Assets",
+        "TotalAssets",
+        "AssetsFairValueDisclosure",
+        "GrossCustomerFinancingAssets",
+        "BalanceSheetAbstract",
+        "StatementOfFinancialPositionAbstract"
+    ],
+    "TotalLiabilities": [
+        "Liabilities",
+        "LiabilitiesFairValueDisclosure",
+        "TotalLiabilities"  # Alternative SEC tag to avoid duplication with Total Assets
+    ],
+    "OperatingCashFlow": [
+        "NetCashProvidedByUsedInOperatingActivities",
+        "CashCashEquivalentsAndShortTermInvestments",
+        "OperatingActivitiesCashFlowsAbstract",
+        "CashGeneratedByOperatingActivities"
+    ],
+    "CurrentAssets": [
+        "AssetsCurrent",
+        "CurrentPortionOfFinancingReceivablesNet",
+        "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent",
+        "CurrentAssets"
+    ],
+    "CurrentLiabilities": [
+        "LiabilitiesCurrent",
+        "AccountsPayableCurrent",
+        "OtherAccruedLiabilitiesCurrent",
+        "CurrentLiabilities"
+    ],
+    "CashPosition": [
+        "CashAndCashEquivalentsAtCarryingValue",
+        "CashAndCashEquivalents",
+        "RestrictedCashAndCashEquivalents",
+        "CashAndShortTermInvestments"
+    ],
+    "Inventory": [
+        "InventoryNet",
+        "ScheduleOfInventoryCurrentTableTextBlock",
+        "InventoryForLongTermContractsOrPrograms",
+        "Inventories"
+    ],
+    "AccountsReceivable": [
+        "AccountsReceivableNet",
+        "AccountsReceivableGrossCurrent",
+        "UnbilledContractsReceivable",
+        "ReceivablesNetCurrent"
+    ],
+    "CapitalExpenditures": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "PropertyPlantAndEquipmentTextBlock",
+        "PropertyPlantAndEquipmentAdditionsNonCash"
+    ],
+    "InterestExpense": [
+        "InterestExpense",
+        "InterestAndDebtExpense",
+        "InterestPaid"
+    ],
+    "IncomeTaxExpense": [
+        "IncomeTaxExpenseBenefit",
+        "DeferredIncomeTaxExpenseBenefit",
+        "EffectiveIncomeTaxRateContinuingOperations"
+    ],
+    "Debt": [
+        "LongTermDebt",
+        "LongTermDebtNoncurrent",
+        "DebtInstrumentCarryingAmount",
+        "LongTermDebtAndCapitalLeaseObligations",
+        "DebtDisclosureTextBlock",
+        "DebtCurrent",  # Added short-term debt tracking
+        "NotesPayable",
+        "DebtObligations",
+        "DebtInstruments"
+    ]
+}
 
     financials = {}
 
@@ -162,7 +192,21 @@ def extract_summary(xbrl_url):
             except ValueError:
                 financials[key] = "N/A"  # If no valid numerical data is found
 
-    # ✅ Compute Debt & Extract Maturities
+    # ✅ Fix Total Liabilities Extraction (Avoid Duplicate from Total Assets)
+    if "TotalLiabilities" in financials and "TotalAssets" in financials:
+        if financials["TotalLiabilities"] == financials["TotalAssets"]:
+            del financials["TotalLiabilities"]  # Remove incorrect duplicate
+            # Re-fetch Total Liabilities from valid tags
+            for tag in ["TotalLiabilities", "Liabilities", "LiabilitiesFairValueDisclosure"]:
+                values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+                if values:
+                    try:
+                        financials["TotalLiabilities"] = float(values[-1].replace(",", ""))
+                        break
+                    except ValueError:
+                        pass
+
+    # ✅ Compute Debt More Accurately
     total_debt = 0
     debt_tags = key_mappings["Debt"]
     
