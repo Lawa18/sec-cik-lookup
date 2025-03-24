@@ -80,7 +80,7 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Key Mappings for Financial Metrics (Updated with IBM & Boeing)**
+    # ✅ **Key Mappings for Financial Metrics**
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -159,7 +159,7 @@ def extract_summary(xbrl_url):
             "DebtDisclosureTextBlock"
         ]
     }
-
+    
     # ✅ Extract Key Financials
     financials = {}
     for key, tags in key_mappings.items():
@@ -168,39 +168,5 @@ def extract_summary(xbrl_url):
             if values:
                 financials[key] = values[-1].replace(",", "")
                 break  # ✅ Stop at first match
-
-    # ✅ Compute Debt & Extract Maturities
-    debt_tags = [
-        "LongTermDebt", "LongTermDebtNoncurrent", "DebtInstrumentCarryingAmount"
-    ]
-    
-    total_debt = 0
-    for tag in debt_tags:
-        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        if values:
-            try:
-                total_debt += float(values[0].replace(",", ""))
-            except ValueError:
-                pass
-
-    # ✅ Extract Debt Maturities
-    debt_maturities = {}
-    maturity_tags = [
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalInNextTwelveMonths",
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearTwo",
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearThree",
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFour",
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalInYearFive",
-        "LongTermDebtMaturitiesRepaymentsOfPrincipalAfterFiveYears"
-    ]
-
-    for tag in maturity_tags:
-        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-        if values:
-            debt_maturities[tag] = values[0].replace(",", "")
-
-    # ✅ Assign Debt Maturities
-    financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
-    financials["DebtMaturities"] = debt_maturities
 
     return financials
