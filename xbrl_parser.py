@@ -179,30 +179,26 @@ def extract_summary(xbrl_url):
 
     financials = {}
 
-    # ✅ **Step 1: Identify Latest Reporting Date**
-    reporting_dates = root.xpath("//context[period/endDate]/period/endDate/text()", namespaces=namespaces)
-    if reporting_dates:
-        latest_reporting_date = max(reporting_dates)  # Get the latest date
-
-    # ✅ **Step 2: Extract Key Financials Only for Latest Reporting Date**
+    # ✅ Extract Key Financials
     for key, tags in key_mappings.items():
         extracted_values = []
         for tag in tags:
-            # Find values associated with the latest reporting date
-            values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
+            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             extracted_values.extend(values)
 
-        # ✅ Convert to numerical format
+        # ✅ Handle Annual Data (10-K) vs. Quarterly (10-Q)
         if extracted_values:
             try:
-                financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
+                latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
+                if latest_values:
+                    financials[key] = max(latest_values)  # ✅ Always take the most recent value
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ **Step 3: Compute Debt More Accurately**
+    # ✅ Compute Debt More Accurately
     total_debt = 0
     for tag in key_mappings["Debt"]:
-        values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
+        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
         if values:
             try:
                 total_debt += float(values[0].replace(",", ""))
@@ -210,18 +206,5 @@ def extract_summary(xbrl_url):
                 pass
 
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
-
-    # ✅ **Step 4: Compute Correct Cash Position (Cash + Short-Term Investments)**
-    cash_values = []
-    for tag in ["CashAndCashEquivalentsAtCarryingValue", "ShortTermInvestments"]:
-        values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
-        cash_values.extend(values)
-
-    if cash_values:
-        try:
-            total_cash = sum(float(v.replace(",", "")) for v in cash_values if v.replace(",", "").replace(".", "").isdigit())
-            financials["CashPosition"] = str(int(total_cash))
-        except ValueError:
-            financials["CashPosition"] = "N/A"
 
     return financials
