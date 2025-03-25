@@ -59,20 +59,6 @@ def find_xbrl_url(index_url):
     return None  # No XBRL file found
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
-import requests
-import time
-import json
-from lxml import etree
-
-# ✅ SEC API Rate Limit (~8-10 requests/sec)
-REQUEST_DELAY = 0.5  # 500ms delay per request
-MAX_RETRIES = 5  # Retry up to 5 times if request fails
-RETRY_DELAY = 5  # Wait 5 sec before retrying failed requests
-TIMEOUT = 10  # Increase API timeout
-
-# ✅ Standard Headers
-HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
-
 def extract_summary(xbrl_url):
     """Extracts key financial metrics ensuring correct Net Income, Equity, and Cash Position"""
 
