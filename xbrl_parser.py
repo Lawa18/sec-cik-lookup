@@ -4,61 +4,14 @@ import json
 from lxml import etree
 
 # ✅ SEC API Rate Limit (~8-10 requests/sec)
-REQUEST_DELAY = 0.5  
-MAX_RETRIES = 5  
-RETRY_DELAY = 5  
-TIMEOUT = 10  
+REQUEST_DELAY = 0.5  # 500ms delay per request
+MAX_RETRIES = 5  # Retry up to 5 times if request fails
+RETRY_DELAY = 5  # Wait 5 sec before retrying failed requests
+TIMEOUT = 10  # Increase API timeout
 
 # ✅ Standard Headers
 HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
 
-# 🔹 STEP 1: FETCH DATA WITH IMPROVED ERROR HANDLING
-def fetch_with_retries(url):
-    """Fetches data from the SEC API with retries & improved error handling."""
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-            
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code in [403, 500, 503]:
-                print(f"⚠️ WARNING: SEC API rate limit hit or server issue. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
-                time.sleep(RETRY_DELAY)
-            else:
-                print(f"❌ ERROR: Unexpected API response ({response.status_code}) - {response.text}")
-                break
-
-        except requests.exceptions.Timeout:
-            print(f"⏳ TIMEOUT: SEC API did not respond. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
-            time.sleep(RETRY_DELAY)
-
-        except requests.exceptions.RequestException as e:
-            print(f"❌ ERROR: API request failed ({str(e)}). Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
-            time.sleep(RETRY_DELAY)
-
-    print("🚨 FINAL ERROR: SEC API failed after multiple attempts. Please try again later.")
-    return None  
-
-# 🔹 STEP 2: FIND XBRL URL
-def find_xbrl_url(index_url):
-    """Finds the XBRL file URL from an SEC index.json."""
-    time.sleep(REQUEST_DELAY)
-
-    response = fetch_with_retries(index_url)
-    if not response:
-        return None
-
-    try:
-        if "directory" in response and "item" in response["directory"]:
-            for file in response["directory"]["item"]:
-                if file["name"].endswith(".xml") and "htm.xml" in file["name"]:
-                    return index_url.replace("index.json", file["name"])
-    except json.JSONDecodeError:
-        return None
-
-    return None  
-
-# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     """Extracts key financial metrics ensuring correct Net Income, Equity, and Cash Position"""
 
@@ -81,15 +34,15 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ New approach ensures correct **Net Income, Equity, Cash Position**
-       key_mappings = {
+    # ✅ **Key Mappings for Financial Metrics**
+    key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "Revenues",
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ FIXED: Pulls the latest *full-year* Net Income
+        "NetIncome": [  # ✅ FIXED: Only extracts the latest Net Income
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
@@ -115,7 +68,7 @@ def extract_summary(xbrl_url):
             "AccountsPayableCurrent",
             "OtherAccruedLiabilitiesCurrent"
         ],
-        "CashPosition": [  # ✅ FIXED: Includes Short-Term Investments
+        "CashPosition": [  # ✅ FIXED: Cash + Short-Term Investments
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
@@ -130,14 +83,13 @@ def extract_summary(xbrl_url):
             "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
             "TotalEquity"
         ],
-        "Debt": [  # ✅ FIXED: Includes "Current Portion of Long-Term Debt"
+        "Debt": [  # ✅ FIXED: More accurate Debt calculation
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
             "LongTermDebtAndCapitalLeaseObligations",
             "DebtCurrent",
-            "NotesPayable",
-            "CurrentPortionOfLongTermDebt"
+            "NotesPayable"
         ]
     }
 
@@ -145,16 +97,8 @@ def extract_summary(xbrl_url):
 
     # ✅ **Step 1: Identify Latest Reporting Date**
     reporting_dates = root.xpath("//context[period/endDate]/period/endDate/text()", namespaces=namespaces)
-    latest_reporting_date = None
-
     if reporting_dates:
         latest_reporting_date = max(reporting_dates)  # Get the latest date
-    else:
-        print("⚠️ WARNING: No reporting dates found in XBRL file.")
-
-    # ✅ Ensure `latest_reporting_date` has a default value
-    if not latest_reporting_date:
-        latest_reporting_date = "2024-12-31"  # Set a default date (this can be adjusted)
 
     # ✅ **Step 2: Extract Key Financials Only for Latest Reporting Date**
     for key, tags in key_mappings.items():
@@ -182,5 +126,18 @@ def extract_summary(xbrl_url):
                 pass
 
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
+
+    # ✅ **Step 4: Compute Correct Cash Position (Cash + Short-Term Investments)**
+    cash_values = []
+    for tag in ["CashAndCashEquivalentsAtCarryingValue", "ShortTermInvestments"]:
+        values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
+        cash_values.extend(values)
+
+    if cash_values:
+        try:
+            total_cash = sum(float(v.replace(",", "")) for v in cash_values if v.replace(",", "").replace(".", "").isdigit())
+            financials["CashPosition"] = str(int(total_cash))
+        except ValueError:
+            financials["CashPosition"] = "N/A"
 
     return financials
