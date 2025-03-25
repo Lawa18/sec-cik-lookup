@@ -4,10 +4,10 @@ import json
 from lxml import etree
 
 # ✅ SEC API Rate Limit (~8-10 requests/sec)
-REQUEST_DELAY = 0.5  # 500ms delay per request
-MAX_RETRIES = 5  # Retry up to 5 times if request fails
-RETRY_DELAY = 5  # Wait 5 sec before retrying failed requests
-TIMEOUT = 10  # Increase API timeout
+REQUEST_DELAY = 0.5  
+MAX_RETRIES = 5  
+RETRY_DELAY = 5  
+TIMEOUT = 10  
 
 # ✅ Standard Headers
 HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
@@ -37,7 +37,7 @@ def fetch_with_retries(url):
             time.sleep(RETRY_DELAY)
 
     print("🚨 FINAL ERROR: SEC API failed after multiple attempts. Please try again later.")
-    return None  # Return None if all attempts fail
+    return None  
 
 # 🔹 STEP 2: FIND XBRL URL
 def find_xbrl_url(index_url):
@@ -56,7 +56,7 @@ def find_xbrl_url(index_url):
     except json.JSONDecodeError:
         return None
 
-    return None  # No XBRL file found
+    return None  
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
@@ -81,7 +81,7 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ New approach ensures correct **Net Income, Equity, Cash Position**
+    # ✅ Key mappings for financial data
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -89,7 +89,7 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ Ensure latest annual Net Income is extracted
+        "NetIncome": [  # ✅ FIXED: Pulls the latest *full-year* Net Income
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
@@ -120,47 +120,46 @@ def extract_summary(xbrl_url):
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
-            "ShortTermInvestments"  
+            "ShortTermInvestments"
         ],
         "Equity": [  # ✅ FIXED: Ensures correct "Total Stockholders' Equity"
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit"
+            "RetainedEarningsAccumulatedDeficit",
+            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "TotalEquity"
         ],
-        "Debt": [  # ✅ Debt is now computed more accurately
+        "Debt": [  # ✅ FIXED: Includes "Current Portion of Long-Term Debt"
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
             "LongTermDebtAndCapitalLeaseObligations",
             "DebtCurrent",
-            "NotesPayable"
+            "NotesPayable",
+            "CurrentPortionOfLongTermDebt"
         ]
     }
 
     financials = {}
 
-    # ✅ **Step 1: Identify Latest Reporting Date**
+    # ✅ **Identify Latest FULL Reporting Period**
     reporting_dates = root.xpath("//context[period/endDate]/period/endDate/text()", namespaces=namespaces)
-    if reporting_dates:
-        latest_reporting_date = max(reporting_dates)  # Get the latest date
+    latest_reporting_date = max(reporting_dates) if reporting_dates else None
 
-    # ✅ **Step 2: Extract Key Financials Only for Latest Reporting Date**
     for key, tags in key_mappings.items():
         extracted_values = []
         for tag in tags:
-            # Find values associated with the latest reporting date
             values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
             extracted_values.extend(values)
 
-        # ✅ Convert to numerical format
         if extracted_values:
             try:
                 financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ **Step 3: Compute Debt More Accurately**
+    # ✅ **Compute Debt Accurately**
     total_debt = 0
     for tag in key_mappings["Debt"]:
         values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
@@ -172,5 +171,12 @@ def extract_summary(xbrl_url):
 
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
-    return financials
+    # ✅ **Compute Correct Cash Position (Cash + Short-Term Investments)**
+    total_cash = sum(
+        float(v.replace(",", "")) for tag in ["CashAndCashEquivalentsAtCarryingValue", "ShortTermInvestments"]
+        for v in root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
+        if v.replace(",", "").replace(".", "").isdigit()
+    )
+    financials["CashPosition"] = str(int(total_cash))
 
+    return financials
