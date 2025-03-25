@@ -12,9 +12,56 @@ TIMEOUT = 10  # Increase API timeout
 # ✅ Standard Headers
 HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
 
-def extract_summary(xbrl_url):
-    """Extracts key financial metrics ensuring correct Net Income, Equity, and Cash Position"""
+# 🔹 STEP 1: FETCH DATA WITH IMPROVED ERROR HANDLING
+def fetch_with_retries(url):
+    """Fetches data from the SEC API with retries & improved error handling."""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code in [403, 500, 503]:
+                print(f"⚠️ WARNING: SEC API rate limit hit or server issue. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+                time.sleep(RETRY_DELAY)
+            else:
+                print(f"❌ ERROR: Unexpected API response ({response.status_code}) - {response.text}")
+                break
 
+        except requests.exceptions.Timeout:
+            print(f"⏳ TIMEOUT: SEC API did not respond. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+            time.sleep(RETRY_DELAY)
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ ERROR: API request failed ({str(e)}). Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+            time.sleep(RETRY_DELAY)
+
+    print("🚨 FINAL ERROR: SEC API failed after multiple attempts. Please try again later.")
+    return None  # Return None if all attempts fail
+
+# 🔹 STEP 2: FIND XBRL URL
+def find_xbrl_url(index_url):
+    """Finds the XBRL file URL from an SEC index.json."""
+    time.sleep(REQUEST_DELAY)
+
+    response = fetch_with_retries(index_url)
+    if not response:
+        return None
+
+    try:
+        if "directory" in response and "item" in response["directory"]:
+            for file in response["directory"]["item"]:
+                if file["name"].endswith(".xml") and "htm.xml" in file["name"]:
+                    return index_url.replace("index.json", file["name"])
+    except json.JSONDecodeError:
+        return None
+
+    return None  # No XBRL file found
+
+# 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
+def extract_summary(xbrl_url):
+    """Parses XBRL data to extract key financial metrics with improved accuracy."""
+    
     if not xbrl_url:
         print("❌ ERROR: Invalid XBRL URL")
         return {}
@@ -34,62 +81,99 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Key Mappings for Financial Metrics**
+    # ✅ **Fully Restored `key_mappings` (Removed Total Liabilities, Added Equity)**
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "Revenues",
+            "RevenueRecognitionPolicyTextBlock",
+            "DisaggregationOfRevenueTableTextBlock",
+            "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
+            "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock",
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ FIXED: Only extracts the latest Net Income
+        "NetIncome": [
             "NetIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted",
-            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
+            "OperatingIncomeLoss",
+            "NetIncomeLossAvailableToCommonStockholdersDiluted"
         ],
         "TotalAssets": [
             "Assets",
             "TotalAssets",
             "AssetsFairValueDisclosure",
-            "GrossCustomerFinancingAssets"
+            "GrossCustomerFinancingAssets",
+            "BalanceSheetAbstract",
+            "StatementOfFinancialPositionAbstract"
         ],
         "OperatingCashFlow": [
             "NetCashProvidedByUsedInOperatingActivities",
+            "CashCashEquivalentsAndShortTermInvestments",
             "OperatingActivitiesCashFlowsAbstract",
             "CashGeneratedByOperatingActivities"
         ],
         "CurrentAssets": [
             "AssetsCurrent",
             "CurrentPortionOfFinancingReceivablesNet",
-            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
+            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent",
+            "CurrentAssets"
         ],
         "CurrentLiabilities": [
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent"
+            "OtherAccruedLiabilitiesCurrent",
+            "CurrentLiabilities"
         ],
-        "CashPosition": [  # ✅ FIXED: Cash + Short-Term Investments
+        "CashPosition": [
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
-            "CashAndShortTermInvestments",
-            "ShortTermInvestments"
+            "CashAndShortTermInvestments"
         ],
-        "Equity": [  # ✅ FIXED: Ensures correct "Total Stockholders' Equity"
-            "StockholdersEquity",
-            "TotalStockholdersEquity",
-            "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit",
-            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
-            "TotalEquity"
+        "Inventory": [
+            "InventoryNet",
+            "ScheduleOfInventoryCurrentTableTextBlock",
+            "InventoryForLongTermContractsOrPrograms",
+            "Inventories"
         ],
-        "Debt": [  # ✅ FIXED: More accurate Debt calculation
+        "AccountsReceivable": [
+            "AccountsReceivableNet",
+            "AccountsReceivableGrossCurrent",
+            "UnbilledContractsReceivable",
+            "ReceivablesNetCurrent"
+        ],
+        "CapitalExpenditures": [
+            "PaymentsToAcquirePropertyPlantAndEquipment",
+            "PropertyPlantAndEquipmentTextBlock",
+            "PropertyPlantAndEquipmentAdditionsNonCash"
+        ],
+        "InterestExpense": [
+            "InterestExpense",
+            "InterestAndDebtExpense",
+            "InterestPaid"
+        ],
+        "IncomeTaxExpense": [
+            "IncomeTaxExpenseBenefit",
+            "DeferredIncomeTaxExpenseBenefit",
+            "EffectiveIncomeTaxRateContinuingOperations"
+        ],
+        "Debt": [
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
             "LongTermDebtAndCapitalLeaseObligations",
+            "DebtDisclosureTextBlock",
             "DebtCurrent",
-            "NotesPayable"
+            "NotesPayable",
+            "DebtObligations",
+            "DebtInstruments"
+        ],
+        "Equity": [
+            "StockholdersEquity",
+            "Equity",
+            "CommonStockValue",
+            "RetainedEarningsAccumulatedDeficit"
         ]
     }
 
