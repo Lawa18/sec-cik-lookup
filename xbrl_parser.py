@@ -82,14 +82,14 @@ def extract_summary(xbrl_url):
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
     # ✅ New approach ensures correct **Net Income, Equity, Cash Position**
-    key_mappings = {
+       key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "Revenues",
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ Ensure latest annual Net Income is extracted
+        "NetIncome": [  # ✅ FIXED: Pulls the latest *full-year* Net Income
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
@@ -120,21 +120,24 @@ def extract_summary(xbrl_url):
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
-            "ShortTermInvestments"  
+            "ShortTermInvestments"
         ],
         "Equity": [  # ✅ FIXED: Ensures correct "Total Stockholders' Equity"
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit"
+            "RetainedEarningsAccumulatedDeficit",
+            "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+            "TotalEquity"
         ],
-        "Debt": [  # ✅ Debt is now computed more accurately
+        "Debt": [  # ✅ FIXED: Includes "Current Portion of Long-Term Debt"
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
             "LongTermDebtAndCapitalLeaseObligations",
             "DebtCurrent",
-            "NotesPayable"
+            "NotesPayable",
+            "CurrentPortionOfLongTermDebt"
         ]
     }
 
