@@ -59,8 +59,22 @@ def find_xbrl_url(index_url):
     return None  # No XBRL file found
 
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
-def extract_summary(xbrl_url, filing_type="10-K"):
-    """Parses XBRL data to extract key financial metrics accurately for 10-K and 10-Q reports."""
+import requests
+import time
+import json
+from lxml import etree
+
+# ✅ SEC API Rate Limit (~8-10 requests/sec)
+REQUEST_DELAY = 0.5  # 500ms delay per request
+MAX_RETRIES = 5  # Retry up to 5 times if request fails
+RETRY_DELAY = 5  # Wait 5 sec before retrying failed requests
+TIMEOUT = 10  # Increase API timeout
+
+# ✅ Standard Headers
+HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
+
+def extract_summary(xbrl_url):
+    """Extracts key financial metrics ensuring correct Net Income, Equity, and Cash Position"""
 
     if not xbrl_url:
         print("❌ ERROR: Invalid XBRL URL")
@@ -81,19 +95,15 @@ def extract_summary(xbrl_url, filing_type="10-K"):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ Fully restored key mappings with FIXED Net Income, Cash Position, and Equity
+    # ✅ New approach ensures correct **Net Income, Equity, Cash Position**
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "Revenues",
             "SalesRevenueNet",
-            "Revenue",
-            "RevenueRecognitionPolicyTextBlock",
-            "DisaggregationOfRevenueTableTextBlock",
-            "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
-            "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock"
+            "Revenue"
         ],
-        "NetIncome": [  # ✅ FIXED: Now correctly pulls latest year's Net Income
+        "NetIncome": [  # ✅ Ensure latest annual Net Income is extracted
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
@@ -102,103 +112,72 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "Assets",
             "TotalAssets",
             "AssetsFairValueDisclosure",
-            "GrossCustomerFinancingAssets",
-            "BalanceSheetAbstract",
-            "StatementOfFinancialPositionAbstract"
+            "GrossCustomerFinancingAssets"
         ],
         "OperatingCashFlow": [
             "NetCashProvidedByUsedInOperatingActivities",
-            "CashCashEquivalentsAndShortTermInvestments",
             "OperatingActivitiesCashFlowsAbstract",
             "CashGeneratedByOperatingActivities"
         ],
         "CurrentAssets": [
             "AssetsCurrent",
             "CurrentPortionOfFinancingReceivablesNet",
-            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent",
-            "CurrentAssets"
+            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
         ],
         "CurrentLiabilities": [
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent",
-            "CurrentLiabilities"
+            "OtherAccruedLiabilitiesCurrent"
         ],
-        "CashPosition": [  # ✅ FIXED: Now includes Short-Term Investments
+        "CashPosition": [  # ✅ FIXED: Includes Short-Term Investments
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
-            "ShortTermInvestments"  # ✅ Ensures Cash Position includes Short-Term Investments
+            "ShortTermInvestments"  
         ],
-        "Inventory": [
-            "InventoryNet",
-            "ScheduleOfInventoryCurrentTableTextBlock",
-            "InventoryForLongTermContractsOrPrograms",
-            "Inventories"
-        ],
-        "AccountsReceivable": [
-            "AccountsReceivableNet",
-            "AccountsReceivableGrossCurrent",
-            "UnbilledContractsReceivable",
-            "ReceivablesNetCurrent"
-        ],
-        "CapitalExpenditures": [
-            "PaymentsToAcquirePropertyPlantAndEquipment",
-            "PropertyPlantAndEquipmentTextBlock",
-            "PropertyPlantAndEquipmentAdditionsNonCash"
-        ],
-        "InterestExpense": [
-            "InterestExpense",
-            "InterestAndDebtExpense",
-            "InterestPaid"
-        ],
-        "IncomeTaxExpense": [
-            "IncomeTaxExpenseBenefit",
-            "DeferredIncomeTaxExpenseBenefit",
-            "EffectiveIncomeTaxRateContinuingOperations"
-        ],
-        "Debt": [
-            "LongTermDebt",
-            "LongTermDebtNoncurrent",
-            "DebtInstrumentCarryingAmount",
-            "LongTermDebtAndCapitalLeaseObligations",
-            "DebtDisclosureTextBlock",
-            "DebtCurrent",  # ✅ Added to ensure correct tracking of short-term and long-term debt
-            "NotesPayable",
-            "DebtObligations",
-            "DebtInstruments"
-        ],
-        "Equity": [  # ✅ FIXED: Now correctly pulls Total Stockholders' Equity
+        "Equity": [  # ✅ FIXED: Ensures correct "Total Stockholders' Equity"
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
             "RetainedEarningsAccumulatedDeficit"
+        ],
+        "Debt": [  # ✅ Debt is now computed more accurately
+            "LongTermDebt",
+            "LongTermDebtNoncurrent",
+            "DebtInstrumentCarryingAmount",
+            "LongTermDebtAndCapitalLeaseObligations",
+            "DebtCurrent",
+            "NotesPayable"
         ]
     }
 
     financials = {}
 
-    # ✅ Extract Key Financials
+    # ✅ **Step 1: Identify Latest Reporting Date**
+    reporting_dates = root.xpath("//context[period/endDate]/period/endDate/text()", namespaces=namespaces)
+    if reporting_dates:
+        latest_reporting_date = max(reporting_dates)  # Get the latest date
+
+    # ✅ **Step 2: Extract Key Financials Only for Latest Reporting Date**
     for key, tags in key_mappings.items():
         extracted_values = []
         for tag in tags:
-            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+            # Find values associated with the latest reporting date
+            values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
             extracted_values.extend(values)
 
-        # ✅ Handle Annual Data (10-K) vs. Quarterly (10-Q)
+        # ✅ Convert to numerical format
         if extracted_values:
             try:
-                latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
-                if latest_values:
-                    financials[key] = max(latest_values)  # ✅ Always take the most recent value
+                financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ Compute Debt More Accurately
+    # ✅ **Step 3: Compute Debt More Accurately**
     total_debt = 0
     for tag in key_mappings["Debt"]:
-        values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
+        values = root.xpath(f"//*[local-name()='{tag}'][../contextRef[contains(text(), '{latest_reporting_date}')]]/text()", namespaces=namespaces)
         if values:
             try:
                 total_debt += float(values[0].replace(",", ""))
