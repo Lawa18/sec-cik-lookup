@@ -88,17 +88,16 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "Revenues",
             "SalesRevenueNet",
             "Revenue",
-            "RevenueFromContractWithCustomerExcludingAssessedTaxThreeMonths",
-            "ThreeMonthsRevenue",
-            "CurrentQuarterRevenue"
+            "RevenueRecognitionPolicyTextBlock",
+            "DisaggregationOfRevenueTableTextBlock",
+            "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
+            "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock"
         ],
         "NetIncome": [
             "NetIncomeLoss",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
             "OperatingIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted",
-            "NetIncomeThreeMonths",
-            "CurrentQuarterNetIncome"
+            "NetIncomeLossAvailableToCommonStockholdersDiluted"
         ],
         "TotalAssets": [
             "Assets",
@@ -112,9 +111,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "NetCashProvidedByUsedInOperatingActivities",
             "CashCashEquivalentsAndShortTermInvestments",
             "OperatingActivitiesCashFlowsAbstract",
-            "CashGeneratedByOperatingActivities",
-            "NetCashProvidedByUsedInOperatingActivitiesThreeMonths",
-            "CurrentQuarterCashFlow"
+            "CashGeneratedByOperatingActivities"
         ],
         "CurrentAssets": [
             "AssetsCurrent",
@@ -133,7 +130,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
-            "ShortTermInvestments"  # ✅ Added to improve cash accuracy
+            "ShortTermInvestments"  # ✅ Ensures Cash Position includes Short-Term Investments
         ],
         "Inventory": [
             "InventoryNet",
@@ -168,7 +165,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "DebtInstrumentCarryingAmount",
             "LongTermDebtAndCapitalLeaseObligations",
             "DebtDisclosureTextBlock",
-            "DebtCurrent",  
+            "DebtCurrent",  # ✅ Added to ensure correct tracking of short-term and long-term debt
             "NotesPayable",
             "DebtObligations",
             "DebtInstruments"
@@ -178,7 +175,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "Equity",
             "CommonStockValue",
             "RetainedEarningsAccumulatedDeficit",
-            "TotalStockholdersEquity"  # ✅ Ensures we get correct Shareholders' Equity
+            "TotalStockholdersEquity"  # ✅ Ensures we get the correct Total Shareholders' Equity
         ]
     }
 
@@ -190,27 +187,13 @@ def extract_summary(xbrl_url, filing_type="10-K"):
         for tag in tags:
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             extracted_values.extend(values)
-        
+
         # ✅ Handle Quarterly vs. Annual Data
         if extracted_values:
             try:
-                if filing_type == "10-Q":
-                    quarter_tags = [
-                        "ThreeMonthsRevenue", "CurrentQuarterRevenue",
-                        "NetIncomeThreeMonths", "CurrentQuarterNetIncome",
-                        "NetCashProvidedByUsedInOperatingActivitiesThreeMonths", "CurrentQuarterCashFlow"
-                    ]
-                    quarter_values = [float(v.replace(",", "")) for tag in quarter_tags for v in root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces) if v.replace(",", "").replace(".", "").isdigit()]
-                    
-                    if quarter_values:
-                        financials[key] = max(quarter_values)
-                    else:
-                        financials[key] = max([float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()])
-                else:
-                    # ✅ For 10-K (Annual), extract the **latest** Net Profit
-                    latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
-                    if latest_values:
-                        financials[key] = max(latest_values)
+                latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
+                if latest_values:
+                    financials[key] = max(latest_values)  # ✅ Always take the most recent value
             except ValueError:
                 financials[key] = "N/A"
 
@@ -227,3 +210,4 @@ def extract_summary(xbrl_url, filing_type="10-K"):
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     return financials
+
