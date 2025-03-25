@@ -96,8 +96,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
         "NetIncome": [  # ✅ FIXED: Now correctly pulls latest year's Net Income
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
-            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
-            "OperatingIncomeLoss"
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
         ],
         "TotalAssets": [
             "Assets",
@@ -173,7 +172,6 @@ def extract_summary(xbrl_url, filing_type="10-K"):
         "Equity": [  # ✅ FIXED: Now correctly pulls Total Stockholders' Equity
             "StockholdersEquity",
             "TotalStockholdersEquity",
-            "Equity",
             "CommonStockValue",
             "RetainedEarningsAccumulatedDeficit"
         ]
@@ -210,5 +208,4 @@ def extract_summary(xbrl_url, filing_type="10-K"):
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     return financials
-
 
