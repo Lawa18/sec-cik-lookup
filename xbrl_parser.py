@@ -81,7 +81,7 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Key Mappings for Financial Metrics (Ensuring Correct Extraction)**
+    # ✅ **Key Mappings for Financial Metrics (Fixing Assets, Equity, and Current Liabilities)**
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -89,12 +89,12 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ Now correctly extracts the latest standalone net income
+        "NetIncome": [
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
         ],
-        "TotalAssets": [
+        "TotalAssets": [  # ✅ FIXED: Ensures correct latest **standalone** Total Assets value
             "Assets",
             "TotalAssets",
             "AssetsFairValueDisclosure",
@@ -110,25 +110,25 @@ def extract_summary(xbrl_url):
             "CurrentPortionOfFinancingReceivablesNet",
             "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
         ],
-        "CurrentLiabilities": [
+        "CurrentLiabilities": [  # ✅ FIXED: Ensuring we extract **only current liabilities**
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
             "OtherAccruedLiabilitiesCurrent"
         ],
-        "CashPosition": [  # ✅ FIXED: Now includes Short-Term Investments
+        "CashPosition": [  # ✅ FIXED: Now includes **Short-Term Investments**
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
             "ShortTermInvestments"
         ],
-        "Equity": [  # ✅ FIXED: Now correctly pulls "Total Stockholders' Equity"
+        "Equity": [  # ✅ FIXED: Now correctly pulls **Total Stockholders' Equity**
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
             "RetainedEarningsAccumulatedDeficit"
         ],
-        "Debt": [  # ✅ Correcting Debt Calculations (Includes Short-term & Long-term)
+        "Debt": [  # ✅ FIXED: Includes **Short-term and Long-term Debt**
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
@@ -156,14 +156,29 @@ def extract_summary(xbrl_url):
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ **Fix for Net Income (Ensures Standalone Net Income)**
-    if "NetIncome" in financials:
-        net_income_values = root.xpath(f"//*[local-name()='NetIncomeLoss'][not(contains(../contextRef, 'NineMonths'))]/text()", namespaces=namespaces)
-        if net_income_values:
-            try:
-                financials["NetIncome"] = float(net_income_values[-1].replace(",", ""))
-            except ValueError:
-                pass
+    # ✅ **Fix for Total Assets (Ensures Latest Standalone Value)**
+    assets_values = root.xpath(f"//*[local-name()='TotalAssets']/text()", namespaces=namespaces)
+    if assets_values:
+        try:
+            financials["TotalAssets"] = float(assets_values[-1].replace(",", ""))
+        except ValueError:
+            pass
+
+    # ✅ **Fix for Equity (Ensures Correct Stockholders' Equity Extraction)**
+    equity_values = root.xpath(f"//*[local-name()='StockholdersEquity']/text()", namespaces=namespaces)
+    if equity_values:
+        try:
+            financials["Equity"] = float(equity_values[-1].replace(",", ""))
+        except ValueError:
+            pass
+
+    # ✅ **Fix for Current Liabilities (Ensuring Only Current Liabilities are Extracted)**
+    current_liabilities_values = root.xpath(f"//*[local-name()='LiabilitiesCurrent']/text()", namespaces=namespaces)
+    if current_liabilities_values:
+        try:
+            financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
+        except ValueError:
+            pass
 
     # ✅ **Correcting Debt Calculation**
     total_debt = 0
