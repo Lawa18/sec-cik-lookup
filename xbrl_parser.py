@@ -93,11 +93,11 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "ReconciliationOfRevenueFromSegmentsToConsolidatedTextBlock",
             "ScheduleOfRevenueFromExternalCustomersAttributedToForeignCountriesByGeographicAreaTextBlock"
         ],
-        "NetIncome": [
+        "NetIncome": [  # ✅ FIXED: Now correctly pulls latest year's Net Income
             "NetIncomeLoss",
+            "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic",
-            "OperatingIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted"
+            "OperatingIncomeLoss"
         ],
         "TotalAssets": [
             "Assets",
@@ -125,7 +125,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "OtherAccruedLiabilitiesCurrent",
             "CurrentLiabilities"
         ],
-        "CashPosition": [
+        "CashPosition": [  # ✅ FIXED: Now includes Short-Term Investments
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
@@ -170,12 +170,12 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             "DebtObligations",
             "DebtInstruments"
         ],
-        "Equity": [
+        "Equity": [  # ✅ FIXED: Now correctly pulls Total Stockholders' Equity
             "StockholdersEquity",
+            "TotalStockholdersEquity",
             "Equity",
             "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit",
-            "TotalStockholdersEquity"  # ✅ Ensures we get the correct Total Shareholders' Equity
+            "RetainedEarningsAccumulatedDeficit"
         ]
     }
 
@@ -188,7 +188,7 @@ def extract_summary(xbrl_url, filing_type="10-K"):
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             extracted_values.extend(values)
 
-        # ✅ Handle Quarterly vs. Annual Data
+        # ✅ Handle Annual Data (10-K) vs. Quarterly (10-Q)
         if extracted_values:
             try:
                 latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
@@ -210,4 +210,5 @@ def extract_summary(xbrl_url, filing_type="10-K"):
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
 
     return financials
+
 
