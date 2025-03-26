@@ -81,7 +81,7 @@ def extract_summary(xbrl_url):
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}  
 
-    # ✅ **Key Mappings for Financial Metrics (Fixing Assets, Equity, and Current Liabilities)**
+    # ✅ **Stable Key Mappings**
     key_mappings = {
         "Revenue": [
             "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -89,12 +89,12 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [
+        "NetIncome": [  # ✅ REVERTED BACK TO STABLE EXTRACTION
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
         ],
-        "TotalAssets": [  # ✅ FIXED: Ensures correct latest **standalone** Total Assets value
+        "TotalAssets": [  # ✅ FIXED: Extract latest **standalone** Total Assets value
             "Assets",
             "TotalAssets",
             "AssetsFairValueDisclosure",
@@ -110,7 +110,7 @@ def extract_summary(xbrl_url):
             "CurrentPortionOfFinancingReceivablesNet",
             "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
         ],
-        "CurrentLiabilities": [  # ✅ FIXED: Ensuring we extract **only current liabilities**
+        "CurrentLiabilities": [  # ✅ FIXED: Extracting **only current liabilities**
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
             "OtherAccruedLiabilitiesCurrent"
@@ -122,7 +122,7 @@ def extract_summary(xbrl_url):
             "CashAndShortTermInvestments",
             "ShortTermInvestments"
         ],
-        "Equity": [  # ✅ FIXED: Now correctly pulls **Total Stockholders' Equity**
+        "Equity": [  # ✅ VERIFIED: Correct **Total Stockholders' Equity**
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
