@@ -157,7 +157,7 @@ def extract_summary(xbrl_url):
                 financials[key] = "N/A"
 
     # ✅ **Fix for Total Assets (Ensures Latest Standalone Value)**
-    assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets']/text()", namespaces=namespaces)
+    assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets' or local-name()='AssetsFairValueDisclosure']/text()", namespaces=namespaces)
     if assets_values:
         try:
             financials["TotalAssets"] = float(assets_values[-1].replace(",", ""))
@@ -165,7 +165,7 @@ def extract_summary(xbrl_url):
             pass
 
     # ✅ **Fix for Current Liabilities**
-    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='CurrentLiabilities']/text()", namespaces=namespaces)
+    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='CurrentLiabilities' or local-name()='AccountsPayableCurrent']/text()", namespaces=namespaces)
     if current_liabilities_values:
         try:
             financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
