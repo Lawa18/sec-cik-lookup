@@ -89,10 +89,9 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  
+        "NetIncome": [  # ✅ FIXED: Only Net Income, avoiding pre-tax earnings
             "NetIncomeLoss",
-            "NetIncomeLossAvailableToCommonStockholdersDiluted",
-            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
+            "NetIncomeLossAvailableToCommonStockholdersDiluted"
         ],
         "TotalAssets": [  
             "Assets",
@@ -116,18 +115,16 @@ def extract_summary(xbrl_url):
             "OtherAccruedLiabilitiesCurrent",
             "CurrentLiabilities"
         ],
-        "CashPosition": [  
+        "CashPosition": [  # ✅ FIXED: Summing cash & short-term investments
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
             "ShortTermInvestments"
         ],
-        "Equity": [  
+        "Equity": [  # ✅ FIXED: Now ensures correct Total Stockholders' Equity
             "StockholdersEquity",
-            "TotalStockholdersEquity",
-            "CommonStockValue",
-            "RetainedEarningsAccumulatedDeficit"
+            "TotalStockholdersEquity"
         ],
         "Debt": [  
             "LongTermDebt",
@@ -156,7 +153,15 @@ def extract_summary(xbrl_url):
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ **Fix for Total Assets (Ensures Latest Standalone Value)**
+    # ✅ **Fix for Cash Position**
+    cash_values = root.xpath("//*[local-name()='CashAndCashEquivalents' or local-name()='CashAndShortTermInvestments' or local-name()='ShortTermInvestments']/text()", namespaces=namespaces)
+    if cash_values:
+        try:
+            financials["CashPosition"] = sum(float(value.replace(",", "")) for value in cash_values)
+        except ValueError:
+            pass
+
+    # ✅ **Fix for Total Assets**
     assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets' or local-name()='AssetsFairValueDisclosure']/text()", namespaces=namespaces)
     if assets_values:
         try:
@@ -169,14 +174,6 @@ def extract_summary(xbrl_url):
     if current_liabilities_values:
         try:
             financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
-        except ValueError:
-            pass
-
-    # ✅ **Fix for Cash Position (Ensuring It Includes Short-Term Investments)**
-    cash_values = root.xpath("//*[local-name()='CashAndCashEquivalents' or local-name()='CashAndShortTermInvestments' or local-name()='ShortTermInvestments']/text()", namespaces=namespaces)
-    if cash_values:
-        try:
-            financials["CashPosition"] = sum(float(value.replace(",", "")) for value in cash_values)
         except ValueError:
             pass
 
