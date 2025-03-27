@@ -89,12 +89,12 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ REVERTED BACK TO STABLE EXTRACTION
+        "NetIncome": [  
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted",
             "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"
         ],
-        "TotalAssets": [  # ✅ FIXED: Extract latest **standalone** Total Assets value
+        "TotalAssets": [  
             "Assets",
             "TotalAssets",
             "AssetsFairValueDisclosure",
@@ -110,25 +110,26 @@ def extract_summary(xbrl_url):
             "CurrentPortionOfFinancingReceivablesNet",
             "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
         ],
-        "CurrentLiabilities": [  # ✅ FIXED: Extracting **only current liabilities**
+        "CurrentLiabilities": [  
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent"
+            "OtherAccruedLiabilitiesCurrent",
+            "CurrentLiabilities"
         ],
-        "CashPosition": [  # ✅ FIXED: Now includes **Short-Term Investments**
+        "CashPosition": [  
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
             "ShortTermInvestments"
         ],
-        "Equity": [  # ✅ VERIFIED: Correct **Total Stockholders' Equity**
+        "Equity": [  
             "StockholdersEquity",
             "TotalStockholdersEquity",
             "CommonStockValue",
             "RetainedEarningsAccumulatedDeficit"
         ],
-        "Debt": [  # ✅ FIXED: Includes **Short-term and Long-term Debt**
+        "Debt": [  
             "LongTermDebt",
             "LongTermDebtNoncurrent",
             "DebtInstrumentCarryingAmount",
@@ -147,36 +148,35 @@ def extract_summary(xbrl_url):
             values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
             extracted_values.extend(values)
 
-        # ✅ Ensure we extract the **latest** standalone quarter/year values
         if extracted_values:
             try:
                 latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
                 if latest_values:
-                    financials[key] = latest_values[-1]  # ✅ Take the latest standalone value
+                    financials[key] = latest_values[-1]  
             except ValueError:
                 financials[key] = "N/A"
 
     # ✅ **Fix for Total Assets (Ensures Latest Standalone Value)**
-    assets_values = root.xpath(f"//*[local-name()='TotalAssets']/text()", namespaces=namespaces)
+    assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets']/text()", namespaces=namespaces)
     if assets_values:
         try:
             financials["TotalAssets"] = float(assets_values[-1].replace(",", ""))
         except ValueError:
             pass
 
-    # ✅ **Fix for Equity (Ensures Correct Stockholders' Equity Extraction)**
-    equity_values = root.xpath(f"//*[local-name()='StockholdersEquity']/text()", namespaces=namespaces)
-    if equity_values:
-        try:
-            financials["Equity"] = float(equity_values[-1].replace(",", ""))
-        except ValueError:
-            pass
-
-    # ✅ **Fix for Current Liabilities (Ensuring Only Current Liabilities are Extracted)**
-    current_liabilities_values = root.xpath(f"//*[local-name()='LiabilitiesCurrent']/text()", namespaces=namespaces)
+    # ✅ **Fix for Current Liabilities**
+    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='CurrentLiabilities']/text()", namespaces=namespaces)
     if current_liabilities_values:
         try:
             financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
+        except ValueError:
+            pass
+
+    # ✅ **Fix for Cash Position (Ensuring It Includes Short-Term Investments)**
+    cash_values = root.xpath("//*[local-name()='CashAndCashEquivalents' or local-name()='CashAndShortTermInvestments' or local-name()='ShortTermInvestments']/text()", namespaces=namespaces)
+    if cash_values:
+        try:
+            financials["CashPosition"] = sum(float(value.replace(",", "")) for value in cash_values)
         except ValueError:
             pass
 
@@ -186,7 +186,7 @@ def extract_summary(xbrl_url):
         values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
         if values:
             try:
-                total_debt += float(values[-1].replace(",", ""))  # ✅ Take latest debt values
+                total_debt += float(values[-1].replace(",", ""))  
             except ValueError:
                 pass
 
