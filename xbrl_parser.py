@@ -89,7 +89,7 @@ def extract_summary(xbrl_url):
             "SalesRevenueNet",
             "Revenue"
         ],
-        "NetIncome": [  # ✅ FIXED: Only Net Income, avoiding pre-tax earnings
+        "NetIncome": [  
             "NetIncomeLoss",
             "NetIncomeLossAvailableToCommonStockholdersDiluted"
         ],
@@ -112,17 +112,16 @@ def extract_summary(xbrl_url):
         "CurrentLiabilities": [  
             "LiabilitiesCurrent",
             "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent",
-            "CurrentLiabilities"
+            "OtherAccruedLiabilitiesCurrent"
         ],
-        "CashPosition": [  # ✅ FIXED: Summing cash & short-term investments
+        "CashPosition": [  
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
             "RestrictedCashAndCashEquivalents",
             "CashAndShortTermInvestments",
             "ShortTermInvestments"
         ],
-        "Equity": [  # ✅ FIXED: Now ensures correct Total Stockholders' Equity
+        "Equity": [  
             "StockholdersEquity",
             "TotalStockholdersEquity"
         ],
@@ -170,7 +169,7 @@ def extract_summary(xbrl_url):
             pass
 
     # ✅ **Fix for Current Liabilities**
-    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='CurrentLiabilities' or local-name()='AccountsPayableCurrent']/text()", namespaces=namespaces)
+    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='AccountsPayableCurrent' or local-name()='OtherAccruedLiabilitiesCurrent']/text()", namespaces=namespaces)
     if current_liabilities_values:
         try:
             financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
