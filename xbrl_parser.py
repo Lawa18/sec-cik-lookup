@@ -95,31 +95,21 @@ def extract_summary(xbrl_url):
         ],
         "TotalAssets": [  
             "Assets",
-            "TotalAssets",
-            "AssetsFairValueDisclosure",
-            "GrossCustomerFinancingAssets"
+            "TotalAssets"
         ],
         "OperatingCashFlow": [
-            "NetCashProvidedByUsedInOperatingActivities",
-            "OperatingActivitiesCashFlowsAbstract",
-            "CashGeneratedByOperatingActivities"
+            "NetCashProvidedByUsedInOperatingActivities"
         ],
         "CurrentAssets": [
-            "AssetsCurrent",
-            "CurrentPortionOfFinancingReceivablesNet",
-            "ContractWithCustomerReceivableBeforeAllowanceForCreditLossCurrent"
+            "AssetsCurrent"
         ],
         "CurrentLiabilities": [  
-            "LiabilitiesCurrent",
-            "AccountsPayableCurrent",
-            "OtherAccruedLiabilitiesCurrent"
+            "LiabilitiesCurrent"
         ],
         "CashPosition": [  
             "CashAndCashEquivalentsAtCarryingValue",
             "CashAndCashEquivalents",
-            "RestrictedCashAndCashEquivalents",
-            "CashAndShortTermInvestments",
-            "ShortTermInvestments"
+            "ShortTermInvestments"  # ✅ Only include short-term, no restricted cash
         ],
         "Equity": [  
             "StockholdersEquity",
@@ -128,10 +118,7 @@ def extract_summary(xbrl_url):
         "Debt": [  
             "LongTermDebt",
             "LongTermDebtNoncurrent",
-            "DebtInstrumentCarryingAmount",
-            "LongTermDebtAndCapitalLeaseObligations",
-            "DebtCurrent",
-            "NotesPayable"
+            "DebtCurrent"
         ]
     }
 
@@ -152,48 +139,40 @@ def extract_summary(xbrl_url):
             except ValueError:
                 financials[key] = "N/A"
 
-    # ✅ **Fix for Cash Position (Summing Cash & Short-Term Investments)**
-    cash_values = root.xpath("//*[local-name()='CashAndCashEquivalents' or local-name()='CashAndShortTermInvestments' or local-name()='ShortTermInvestments' or local-name()='RestrictedCashAndCashEquivalents']/text()", namespaces=namespaces)
+    # ✅ **Fix for Cash Position (Summing Only Liquid Assets)**
+    cash_values = root.xpath("//*[local-name()='CashAndCashEquivalents' or local-name()='ShortTermInvestments']/text()", namespaces=namespaces)
     if cash_values:
         try:
             financials["CashPosition"] = sum(float(value.replace(",", "")) for value in cash_values)
         except ValueError:
             financials["CashPosition"] = "N/A"
 
-    # ✅ **Fix for Total Assets (Ensuring It Picks the Largest Standalone Value)**
-    total_assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets' or local-name()='AssetsFairValueDisclosure']/text()", namespaces=namespaces)
+    # ✅ **Fix for Total Assets (Ensuring Correct Period Selection)**
+    total_assets_values = root.xpath("//*[local-name()='Assets' or local-name()='TotalAssets']/text()", namespaces=namespaces)
     if total_assets_values:
         try:
             financials["TotalAssets"] = max(float(value.replace(",", "")) for value in total_assets_values)
         except ValueError:
             financials["TotalAssets"] = "N/A"
 
-    # ✅ **Fix for Total Liabilities (Separate from Current Liabilities)**
-    total_liabilities_values = root.xpath("//*[local-name()='Liabilities' or local-name()='TotalLiabilitiesNet' or local-name()='LiabilitiesFairValue']/text()", namespaces=namespaces)
-    if total_liabilities_values:
-        try:
-            financials["TotalLiabilities"] = max(float(value.replace(",", "")) for value in total_liabilities_values)
-        except ValueError:
-            financials["TotalLiabilities"] = "N/A"
-
-    # ✅ **Fix for Current Liabilities**
-    current_liabilities_values = root.xpath("//*[local-name()='LiabilitiesCurrent' or local-name()='AccountsPayableCurrent' or local-name()='OtherAccruedLiabilitiesCurrent']/text()", namespaces=namespaces)
-    if current_liabilities_values:
-        try:
-            financials["CurrentLiabilities"] = float(current_liabilities_values[-1].replace(",", ""))
-        except ValueError:
-            financials["CurrentLiabilities"] = "N/A"
-
-    # ✅ **Correcting Debt Calculation**
+    # ✅ **Fix for Total Debt (Ensuring Correct Inclusion)**
     total_debt = 0
     for tag in key_mappings["Debt"]:
         values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
         if values:
             try:
-                total_debt += float(values[-1].replace(",", ""))  
+                total_debt += float(values[-1].replace(",", ""))
             except ValueError:
                 pass
 
     financials["Debt"] = str(int(total_debt)) if total_debt > 0 else "N/A"
+
+    # ✅ **Fix for Equity Extraction**
+    equity_values = root.xpath("//*[local-name()='StockholdersEquity' or local-name()='TotalStockholdersEquity']/text()", namespaces=namespaces)
+    if equity_values:
+        try:
+            financials["Equity"] = float(equity_values[-1].replace(",", ""))
+        except ValueError:
+            financials["Equity"] = "N/A"
 
     return financials
