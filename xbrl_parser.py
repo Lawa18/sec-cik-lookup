@@ -4,10 +4,10 @@ import json
 from lxml import etree
 
 # ✅ SEC API Rate Limit (~8-10 requests/sec)
-REQUEST_DELAY = 0.5  
-MAX_RETRIES = 5  
-RETRY_DELAY = 5  
-TIMEOUT = 10  
+REQUEST_DELAY = 0.5
+MAX_RETRIES = 5
+RETRY_DELAY = 5
+TIMEOUT = 10
 
 # ✅ Standard Headers
 HEADERS = {"User-Agent": "Lars Wallin lars.e.wallin@gmail.com"}
@@ -20,18 +20,13 @@ def fetch_with_retries(url):
             if response.status_code == 200:
                 return response.json()
             elif response.status_code in [403, 500, 503]:
-                print(f"⚠️ WARNING: SEC API rate limit hit or server issue. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
                 time.sleep(RETRY_DELAY)
             else:
-                print(f"❌ ERROR: Unexpected API response ({response.status_code}) - {response.text}")
                 break
         except requests.exceptions.Timeout:
-            print(f"⏳ TIMEOUT: SEC API did not respond. Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
             time.sleep(RETRY_DELAY)
-        except requests.exceptions.RequestException as e:
-            print(f"❌ ERROR: API request failed ({str(e)}). Retrying in {RETRY_DELAY} sec (Attempt {attempt}/{MAX_RETRIES})...")
+        except requests.exceptions.RequestException:
             time.sleep(RETRY_DELAY)
-    print("🚨 FINAL ERROR: SEC API failed after multiple attempts. Please try again later.")
     return None
 
 # 🔹 STEP 2: FIND XBRL URL
@@ -52,19 +47,16 @@ def find_xbrl_url(index_url):
 # 🔹 STEP 3: EXTRACT FINANCIAL DATA FROM XBRL
 def extract_summary(xbrl_url):
     if not xbrl_url:
-        print("❌ ERROR: Invalid XBRL URL")
         return {}
 
     time.sleep(REQUEST_DELAY)
     response = requests.get(xbrl_url, headers=HEADERS, timeout=TIMEOUT)
     if response.status_code != 200:
-        print("❌ ERROR: Failed to fetch XBRL file")
         return {}
 
     try:
         root = etree.fromstring(response.content)
     except etree.XMLSyntaxError:
-        print("❌ ERROR: XML parsing failed")
         return {}
 
     namespaces = {k if k else "default": v for k, v in root.nsmap.items()}
@@ -72,37 +64,49 @@ def extract_summary(xbrl_url):
     key_mappings = {
         "Revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet", "Revenue"],
         "NetIncome": ["NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersDiluted"],
-        "IncomeTaxes": ["IncomeTaxExpenseBenefit", "ProvisionForIncomeTaxes"],
         "TotalAssets": ["Assets", "TotalAssets", "AssetsFairValueDisclosure"],
-        "CurrentAssets": ["AssetsCurrent"],
-        "CashPosition": ["CashAndCashEquivalents", "CashAndShortTermInvestments", "ShortTermInvestments", "RestrictedCashAndCashEquivalents"],
-        "CurrentLiabilities": ["LiabilitiesCurrent"],
-        "TotalLiabilities": ["Liabilities", "TotalLiabilitiesNet", "LiabilitiesFairValue"],
-        "Equity": ["StockholdersEquity", "TotalStockholdersEquity"],
         "OperatingCashFlow": ["NetCashProvidedByUsedInOperatingActivities"],
-        "Capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
-        "Debt": ["LongTermDebt", "LongTermDebtNoncurrent", "DebtCurrent", "NotesPayable"]
+        "CurrentAssets": ["AssetsCurrent"],
+        "CurrentLiabilities": ["LiabilitiesCurrent"],
+        "CashPosition": ["CashAndCashEquivalents"],
+        "Equity": ["StockholdersEquity", "TotalStockholdersEquity"],
+        "CapEx": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+        "IncomeTaxExpense": ["IncomeTaxExpenseBenefit"],
+        "Debt": ["LongTermDebt", "DebtCurrent"]
     }
 
     financials = {}
 
     for key, tags in key_mappings.items():
-        extracted_values = []
+        best_value = None
         for tag in tags:
-            values = root.xpath(f"//*[local-name()='{tag}']/text()", namespaces=namespaces)
-            extracted_values.extend(values)
+            values = root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces)
+            for node in values:
+                value = node.text
+                context = node.get("contextRef", "")
+                if value and value.replace("-", "").replace(",", "").replace(".", "").isdigit():
+                    try:
+                        float_val = float(value.replace(",", ""))
+                        if best_value is None or ("2025" in context and abs(float_val) > abs(best_value)):
+                            best_value = float_val
+                    except ValueError:
+                        continue
+        if best_value is not None:
+            financials[key] = best_value
+        else:
+            financials[key] = "N/A"
 
-        if extracted_values:
-            try:
-                latest_values = [float(v.replace(",", "")) for v in extracted_values if v.replace(",", "").replace(".", "").isdigit()]
-                if latest_values:
-                    if key == "CashPosition":
-                        financials[key] = sum(latest_values)
-                    elif key == "Debt":
-                        financials[key] = str(int(sum(latest_values))) if sum(latest_values) > 0 else "N/A"
-                    else:
-                        financials[key] = max(latest_values)
-            except ValueError:
-                financials[key] = "N/A"
+    total_debt = 0
+    for tag in key_mappings["Debt"]:
+        for node in root.xpath(f"//*[local-name()='{tag}']", namespaces=namespaces):
+            context = node.get("contextRef", "")
+            value = node.text
+            if value and "2025" in context:
+                try:
+                    total_debt += float(value.replace(",", ""))
+                except ValueError:
+                    continue
+    if total_debt > 0:
+        financials["Debt"] = round(total_debt, 2)
 
     return financials
