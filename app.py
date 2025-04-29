@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from data_router import get_financial_data
 from sec_api import get_company_sic_info
