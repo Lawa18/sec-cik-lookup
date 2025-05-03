@@ -2,7 +2,7 @@ import requests
 import time
 import os
 
-# Basic request headers to SEC
+# A Basic request headers to SEC
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
     'Accept-Encoding': 'gzip, deflate',
