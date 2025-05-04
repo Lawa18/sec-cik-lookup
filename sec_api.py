@@ -156,7 +156,6 @@ def get_recent_filings(cik, k_count=2, q_count=4):
         elif f["form"] == "10-Q" and q_fetched < q_count:
             results.append(("10-Q", f["accession"], f["date"]))
             q_fetched += 1
-
         if k_fetched >= k_count and q_fetched >= q_count:
             break
 
