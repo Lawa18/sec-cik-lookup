@@ -1,7 +1,7 @@
 import requests
 import time
 import os
-from xbrl_parser import find_xbrl_url, extract_summary  # ✅ Import once at the top
+from xbrl_parser import find_xbrl_url  # ✅ Removed extract_summary
 
 # Basic request headers to SEC
 HEADERS = {
@@ -92,14 +92,14 @@ def get_sec_financials(cik):
 
         index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
         xbrl_url = find_xbrl_url(index_url)
-        financials = extract_summary(xbrl_url) if xbrl_url else {}
+        xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
 
         filing_data = {
             "formType": form,
             "filingDate": filing_dates[i],
             "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{primary_documents[i]}",
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
-            "financials": financials
+            "xbrl_text": xbrl_text if xbrl_text else "Missing XBRL content"
         }
 
         if form in ["10-K", "20-F"]:
@@ -109,7 +109,7 @@ def get_sec_financials(cik):
 
     historical_quarters = [
         filing for filing in historical_quarters
-        if filing.get("financials") and isinstance(filing["financials"], dict) and any(value != "N/A" for value in filing["financials"].values())
+        if filing.get("xbrl_text") and isinstance(filing["xbrl_text"], str) and "<xbrli:xbrl" in filing["xbrl_text"]
     ]
 
     return {
@@ -136,7 +136,6 @@ def get_recent_filings(cik, k_count=2, q_count=4):
     accessions = data.get('accessionNumber', [])
     filing_dates = data.get('filingDate', [])
 
-    # ✅ Include 20-F for foreign filers like Airbnb
     all_filings = [
         {"form": form, "accession": acc, "date": date}
         for form, acc, date in zip(forms, accessions, filing_dates)
