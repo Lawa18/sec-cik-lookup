@@ -1,16 +1,7 @@
 import requests
-from xbrl_parser import find_xbrl_url, extract_summary  # ✅ Import once at the top
-
-def fetch_sec_data(cik):
-    """Fetch latest and historical financials from SEC API."""
-    sec_url = f"https://data.sec.gov/submissions/CIK{cik}.json"
-    headers = {
-        "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",
-        "Accept": "application/json"
-    }
-    
 import time
 import os
+from xbrl_parser import find_xbrl_url, extract_summary  # ✅ Import once at the top
 
 # Basic request headers to SEC
 HEADERS = {
@@ -21,7 +12,6 @@ HEADERS = {
 }
 
 SEC_API_BASE = 'https://data.sec.gov'
-
 
 def safe_get(url, headers=HEADERS, retries=3, delay=1):
     for attempt in range(retries):
@@ -34,27 +24,35 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
             time.sleep(delay)
     raise Exception(f"Failed to fetch URL after {retries} attempts: {url}")
 
+def fetch_sec_data(cik):
+    sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
+    headers = {
+        "User-Agent": "Lars Wallin lars.e.wallin@gmail.com",
+        "Accept": "application/json"
+    }
+    try:
+        sec_response = requests.get(sec_url, headers=headers, timeout=10)
+        sec_response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
+        return {}
+    return sec_response.json()
 
 def get_company_submissions(cik):
     cik = cik.zfill(10)
     url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
     return safe_get(url).json()
 
-
 def get_filing_index(cik, accession):
     acc_no_no_hyphens = accession.replace('-', '')
     url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no_no_hyphens}/index.json"
-try:
-        sec_response = requests.get(sec_url, headers=headers, timeout=10)  # ✅ Added timeout for reliability
-        sec_response.raise_for_status()  # ✅ Raises an error for bad responses (4xx, 5xx)
-    except requests.RequestException as e:
-        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
-        return {}  # ✅ Return empty dictionary instead of None to prevent crashes
-
-    return sec_response.json()
+    try:
+        return safe_get(url).json()
+    except Exception:
+        hyphenated_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/index.json"
+        return safe_get(hyphenated_url).json()
 
 def get_sec_financials(cik):
-    """Extracts the last 5 years of annual and last 4 quarters of financials from SEC filings."""
     data = fetch_sec_data(cik)
     if not data:
         return {
@@ -72,12 +70,10 @@ def get_sec_financials(cik):
 
     historical_annuals = []
     historical_quarters = []
-    
     seen_years = set()
     seen_quarters = 0
 
     for i, form in enumerate(forms):
-        # ✅ Prevent index errors
         if i >= len(filing_dates) or i >= len(accession_numbers) or i >= len(primary_documents):
             continue
 
@@ -88,7 +84,7 @@ def get_sec_financials(cik):
         elif form in ["10-Q", "6-K"] and seen_quarters < 4:
             seen_quarters += 1
         else:
-            continue  # ✅ Skip if we already have enough filings
+            continue
 
         accession_number = accession_numbers[i]
         if not accession_number:
@@ -111,15 +107,17 @@ def get_sec_financials(cik):
         elif form in ["10-Q", "6-K"]:
             historical_quarters.append(filing_data)
 
-    # ✅ Filter out 6-Ks with no financial data
     historical_quarters = [
-        filing for filing in historical_quarters 
+        filing for filing in historical_quarters
         if filing.get("financials") and isinstance(filing["financials"], dict) and any(value != "N/A" for value in filing["financials"].values())
-        return safe_get(url).json()
-    except Exception:
-        hyphenated_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/index.json"
-        return safe_get(hyphenated_url).json()
+    ]
 
+    return {
+        "company": data.get("name", "Unknown"),
+        "cik": cik,
+        "historical_annuals": historical_annuals,
+        "historical_quarters": historical_quarters
+    }
 
 def find_instance_xbrl_url(index_data, cik, accession):
     acc_no = accession.replace('-', '')
@@ -129,7 +127,6 @@ def find_instance_xbrl_url(index_data, cik, accession):
         if filename.endswith(".xml") and '_def' not in filename and '_pre' not in filename and '_lab' not in filename and '_cal' not in filename:
             return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
     return None
-
 
 def get_recent_filings(cik, k_count=2, q_count=4):
     cik = cik.zfill(10)
@@ -143,14 +140,8 @@ def get_recent_filings(cik, k_count=2, q_count=4):
         {"form": form, "accession": acc, "date": date}
         for form, acc, date in zip(forms, accessions, filing_dates)
         if form in ['10-K', '10-Q']
-]
+    ]
 
-    return {
-        "company": data.get("name", "Unknown"),
-        "cik": cik,
-        "historical_annuals": historical_annuals,
-        "historical_quarters": historical_quarters
-    }
     all_filings.sort(key=lambda x: x['date'], reverse=True)
 
     results = []
@@ -171,11 +162,9 @@ def get_recent_filings(cik, k_count=2, q_count=4):
 
     return results
 
-
 def download_multiple_xbrl(cik, save_dir='xbrl_files'):
     os.makedirs(save_dir, exist_ok=True)
     filings = get_recent_filings(cik)
-
     downloaded_files = []
 
     for form_type, acc, date in filings:
@@ -197,7 +186,6 @@ def download_multiple_xbrl(cik, save_dir='xbrl_files'):
             print(f"❌ Error fetching {form_type} for {cik}: {e}")
 
     return downloaded_files
-
 
 if __name__ == "__main__":
     cik = "0001543151"  # Uber example
