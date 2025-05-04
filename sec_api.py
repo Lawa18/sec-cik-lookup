@@ -187,6 +187,13 @@ def download_multiple_xbrl(cik, save_dir='xbrl_files'):
 
     return downloaded_files
 
+def get_company_sic_info(cik):
+    """Fetch the SIC code and description from the company's SEC submission."""
+    data = get_company_submissions(cik)
+    sic = data.get("companyInfo", {}).get("sic")
+    description = data.get("companyInfo", {}).get("sicDescription")
+    return sic, description
+
 if __name__ == "__main__":
     cik = "0001543151"  # Uber example
     download_multiple_xbrl(cik)
