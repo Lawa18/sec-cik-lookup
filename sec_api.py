@@ -136,10 +136,11 @@ def get_recent_filings(cik, k_count=2, q_count=4):
     accessions = data.get('accessionNumber', [])
     filing_dates = data.get('filingDate', [])
 
+    # ✅ Include 20-F for foreign filers like Airbnb
     all_filings = [
         {"form": form, "accession": acc, "date": date}
         for form, acc, date in zip(forms, accessions, filing_dates)
-        if form in ['10-K', '10-Q']
+        if form in ['10-K', '10-Q', '20-F']
     ]
 
     all_filings.sort(key=lambda x: x['date'], reverse=True)
@@ -150,12 +151,13 @@ def get_recent_filings(cik, k_count=2, q_count=4):
 
     for f in all_filings:
         print(f"📄 Found {f['form']} filing: {f['accession']} dated {f['date']}")
-        if f["form"] == "10-K" and k_fetched < k_count:
-            results.append(("10-K", f["accession"], f["date"]))
+        if f["form"] in ["10-K", "20-F"] and k_fetched < k_count:
+            results.append((f["form"], f["accession"], f["date"]))
             k_fetched += 1
         elif f["form"] == "10-Q" and q_fetched < q_count:
-            results.append(("10-Q", f["accession"], f["date"]))
+            results.append((f["form"], f["accession"], f["date"]))
             q_fetched += 1
+
         if k_fetched >= k_count and q_fetched >= q_count:
             break
 
@@ -194,5 +196,5 @@ def get_company_sic_info(cik):
     return sic, description
 
 if __name__ == "__main__":
-    cik = "0001543151"  # Uber example
+    cik = "0001559720"  # Airbnb
     download_multiple_xbrl(cik)
