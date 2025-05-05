@@ -195,5 +195,5 @@ def get_company_sic_info(cik):
     return sic, description
 
 if __name__ == "__main__":
-    cik = "0001559720"  # Airbnb
-    download_multiple_xbrl(cik)
+    cik = "0001559720"  # Example: Airbnb
+    print(get_sec_financials(cik))
