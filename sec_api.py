@@ -1,7 +1,10 @@
 import requests
 import time
 import os
+from flask import Flask, request, jsonify
 from xbrl_parser import find_xbrl_url  # ✅ Removed extract_summary
+
+app = Flask(__name__)
 
 # Basic request headers to SEC
 HEADERS = {
@@ -188,12 +191,29 @@ def download_multiple_xbrl(cik, save_dir='xbrl_files'):
     return downloaded_files
 
 def get_company_sic_info(cik):
-    """Fetch the SIC code and description from the company's SEC submission."""
     data = get_company_submissions(cik)
     sic = data.get("companyInfo", {}).get("sic")
     description = data.get("companyInfo", {}).get("sicDescription")
     return sic, description
 
+@app.route("/resolve_cik", methods=["GET"])
+def resolve_cik():
+    company = request.args.get("company", "")
+    if not company:
+        return jsonify({"error": "Missing 'company' query parameter"}), 400
+
+    try:
+        url = "https://www.sec.gov/files/company_tickers.json"
+        res = requests.get(url, headers=HEADERS)
+        res.raise_for_status()
+        tickers = res.json()
+        for entry in tickers.values():
+            if company.lower() in entry["title"].lower():
+                return jsonify({"cik": str(entry["cik_str"]).zfill(10)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"error": f"CIK not found for company: {company}"}), 404
+
 if __name__ == "__main__":
-    cik = "0001559720"  # Example: Airbnb
-    print(get_sec_financials(cik))
+    app.run(debug=True)
