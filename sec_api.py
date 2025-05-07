@@ -1,12 +1,13 @@
 import requests
 import time
 import os
+import lxml.etree as ET
+import yaml
 from flask import Flask, request, jsonify
-from xbrl_parser import find_xbrl_url  # ✅ Removed extract_summary
+from xbrl_parser import find_xbrl_url
 
 app = Flask(__name__)
 
-# Basic request headers to SEC
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
     'Accept-Encoding': 'gzip, deflate',
@@ -15,6 +16,8 @@ HEADERS = {
 }
 
 SEC_API_BASE = 'https://data.sec.gov'
+
+FALLBACK_TAGS = {'Revenue': ['us-gaap:Revenues', 'us-gaap:SalesRevenueNet', 'us-gaap:SalesRevenueGoodsGross', 'us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax', 'us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax', 'us-gaap:RevenueFromContractWithCustomer', 'us-gaap:Revenue', 'us-gaap:RevenueFromContractsWithCustomers'], 'COGS': ['us-gaap:CostOfRevenue', 'us-gaap:CostOfRevenues', 'us-gaap:CostOfGoodsSold', 'us-gaap:CostOfGoodsAndServicesSold', 'us-gaap:CostOfSales', 'PG_CostOfGoodsSold'], 'OperatingIncome': ['us-gaap:OperatingIncomeLoss', 'us-gaap:ProfitLossFromOperatingActivities'], 'EBITDA': ['us-gaap:EBITDA', 'us-gaap:EarningsBeforeInterestTaxesDepreciationAmortization', 'us-gaap:AdjustedEBITDA'], 'InterestExpense': ['us-gaap:InterestExpense', 'us-gaap:InterestAndDebtExpense', 'us-gaap:InterestIncomeExpenseNonoperatingNet', 'us-gaap:FinanceCosts', 'us-gaap:InterestExpenseDebt', 'us-gaap:InterestAndOtherDebtExpense', 'us-gaap:InterestExpenseAndFinanceCost'], 'NetIncome': ['us-gaap:NetIncomeLoss', 'us-gaap:ProfitLoss', 'us-gaap:NetIncome'], 'TotalAssets': ['us-gaap:Assets'], 'CurrentAssets': ['us-gaap:AssetsCurrent', 'us-gaap:CurrentAssets', 'us-gaap:CurrentAssetsAndOtherAssets'], 'Cash': ['us-gaap:CashAndCashEquivalentsAtCarryingValue', 'us-gaap:CashAndCashEquivalents', 'us-gaap:CashCashEquivalentsAndShortTermInvestments'], 'Receivables': ['us-gaap:AccountsReceivableNetCurrent', 'us-gaap:ReceivablesNetCurrent', 'us-gaap:TradeAndOtherReceivables', 'us-gaap:TradeReceivablesGrossCurrent', 'us-gaap:CurrentTradeReceivables'], 'Inventory': ['us-gaap:InventoryNet', 'us-gaap:Inventories', 'us-gaap:FinishedGoods', 'us-gaap:RawMaterials', 'us-gaap:WorkInProcess'], 'CurrentLiabilities': ['us-gaap:LiabilitiesCurrent', 'us-gaap:CurrentLiabilities'], 'ShortTermDebt': ['us-gaap:ShortTermBorrowings', 'us-gaap:ShorttermBorrowings', 'us-gaap:DebtCurrent', 'us-gaap:BorrowingsCurrent', 'us-gaap:DebtInstrumentCurrent'], 'LongTermDebt': ['us-gaap:LongTermDebt', 'us-gaap:NoncurrentBorrowings', 'us-gaap:BorrowingsNoncurrent', 'us-gaap:DebtInstrumentNoncurrent'], 'TotalLiabilities': ['us-gaap:Liabilities', 'us-gaap:LiabilitiesAndStockholdersEquity'], 'Equity': ['us-gaap:StockholdersEquity', 'us-gaap:Equity', 'us-gaap:EquityAttributableToOwnersOfParent', 'us-gaap:LiabilitiesAndStockholdersEquityIncludingPortionAttributableToNoncontrollingInterestMinusLiabilities'], 'OperatingCashFlow': ['us-gaap:NetCashProvidedByUsedInOperatingActivities', 'us-gaap:NetCashFlowsFromOperatingActivities', 'us-gaap:CashFlowsFromUsedInOperatingActivities', 'us-gaap:NetCashProvidedByOperatingActivities'], 'CapitalExpenditures': ['us-gaap:PaymentsToAcquirePropertyPlantAndEquipment', 'us-gaap:PurchaseOfPropertyPlantAndEquipment', 'us-gaap:PaymentsForPropertyPlantAndEquipment', 'us-gaap:CapitalExpenditurePayments']}
 
 def safe_get(url, headers=HEADERS, retries=3, delay=1):
     for attempt in range(retries):
@@ -26,6 +29,29 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(delay)
     raise Exception(f"Failed to fetch URL after {retries} attempts: {url}")
+
+def extract_line_items(xbrl_text, fallback_tags):
+    extracted = {}
+    try:
+        root = ET.fromstring(xbrl_text.encode("utf-8"))
+        for metric, tags in fallback_tags.items():
+            found = False
+            for tag in tags:
+                parts = tag.split(":")
+                local_tag = parts[-1]
+                el = root.find(f".//{*}{local_tag}")
+                if el is not None and el.text and el.text.strip():
+                    try:
+                        extracted[metric] = float(el.text.replace(",", "").replace("(", "-").replace(")", ""))
+                    except:
+                        extracted[metric] = el.text.strip()
+                    found = True
+                    break
+            if not found:
+                extracted[metric] = "Missing tag"
+    except Exception as e:
+        print(f"❌ XBRL Parse error: {e}")
+    return extracted
 
 def fetch_sec_data(cik):
     sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
@@ -96,24 +122,20 @@ def get_sec_financials(cik):
         index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
         xbrl_url = find_xbrl_url(index_url)
         xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
+        extracted_data = extract_line_items(xbrl_text, FALLBACK_TAGS) if xbrl_text else {}
 
         filing_data = {
             "formType": form,
             "filingDate": filing_dates[i],
             "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{primary_documents[i]}",
             "xbrlUrl": xbrl_url if xbrl_url else "XBRL file not found.",
-            "xbrl_text": xbrl_text if xbrl_text else "Missing XBRL content"
+            "extracted": extracted_data
         }
 
         if form in ["10-K", "20-F"]:
             historical_annuals.append(filing_data)
         elif form in ["10-Q", "6-K"]:
             historical_quarters.append(filing_data)
-
-    historical_quarters = [
-        filing for filing in historical_quarters
-        if filing.get("xbrl_text") and isinstance(filing["xbrl_text"], str) and "<xbrli:xbrl" in filing["xbrl_text"]
-    ]
 
     return {
         "company": data.get("name", "Unknown"),
@@ -130,71 +152,6 @@ def find_instance_xbrl_url(index_data, cik, accession):
         if filename.endswith(".xml") and '_def' not in filename and '_pre' not in filename and '_lab' not in filename and '_cal' not in filename:
             return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
     return None
-
-def get_recent_filings(cik, k_count=2, q_count=4):
-    cik = cik.zfill(10)
-    url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
-    data = safe_get(url).json().get('filings', {}).get('recent', {})
-    forms = data.get('form', [])
-    accessions = data.get('accessionNumber', [])
-    filing_dates = data.get('filingDate', [])
-
-    all_filings = [
-        {"form": form, "accession": acc, "date": date}
-        for form, acc, date in zip(forms, accessions, filing_dates)
-        if form in ['10-K', '10-Q', '20-F']
-    ]
-
-    all_filings.sort(key=lambda x: x['date'], reverse=True)
-
-    results = []
-    k_fetched = 0
-    q_fetched = 0
-
-    for f in all_filings:
-        print(f"📄 Found {f['form']} filing: {f['accession']} dated {f['date']}")
-        if f["form"] in ["10-K", "20-F"] and k_fetched < k_count:
-            results.append((f["form"], f["accession"], f["date"]))
-            k_fetched += 1
-        elif f["form"] == "10-Q" and q_fetched < q_count:
-            results.append((f["form"], f["accession"], f["date"]))
-            q_fetched += 1
-
-        if k_fetched >= k_count and q_fetched >= q_count:
-            break
-
-    return results
-
-def download_multiple_xbrl(cik, save_dir='xbrl_files'):
-    os.makedirs(save_dir, exist_ok=True)
-    filings = get_recent_filings(cik)
-    downloaded_files = []
-
-    for form_type, acc, date in filings:
-        try:
-            print(f"📥 Processing {form_type} for {cik} — Accession: {acc} — Date: {date}")
-            index_data = get_filing_index(cik, acc)
-            xbrl_url = find_instance_xbrl_url(index_data, cik, acc)
-            if xbrl_url:
-                response = safe_get(xbrl_url)
-                filename = f"{cik}_{form_type}_{date}.xml"
-                filepath = os.path.join(save_dir, filename)
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                print(f"✅ Downloaded {form_type} ({date}) to: {filepath}")
-                downloaded_files.append(filepath)
-            else:
-                print(f"⚠️ No XBRL instance found for {form_type} {date}")
-        except Exception as e:
-            print(f"❌ Error fetching {form_type} for {cik}: {e}")
-
-    return downloaded_files
-
-def get_company_sic_info(cik):
-    data = get_company_submissions(cik)
-    sic = data.get("companyInfo", {}).get("sic")
-    description = data.get("companyInfo", {}).get("sicDescription")
-    return sic, description
 
 @app.route("/resolve_cik", methods=["GET"])
 def resolve_cik():
