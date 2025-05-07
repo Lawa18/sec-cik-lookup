@@ -4,6 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 from flask import Flask, request, jsonify
+from xbrl_parser import find_xbrl_url  # Ensure this exists
 
 app = Flask(__name__)
 
@@ -54,6 +55,120 @@ def extract_line_items(xbrl_text, fallback_tags):
     except Exception as e:
         print(f"❌ XBRL Parse error: {e}")
     return extracted
+
+def fetch_sec_data(cik):
+    sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
+    try:
+        sec_response = requests.get(sec_url, headers=HEADERS, timeout=10)
+        sec_response.raise_for_status()
+        return sec_response.json()
+    except requests.RequestException as e:
+        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
+        return {}
+
+def get_filing_index(cik, accession):
+    acc_no_no_hyphens = accession.replace('-', '')
+    url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no_no_hyphens}/index.json"
+    try:
+        return safe_get(url).json()
+    except Exception:
+        fallback_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/index.json"
+        return safe_get(fallback_url).json()
+
+def get_sec_financials(cik):
+    data = fetch_sec_data(cik)
+    if not data:
+        return {
+            "company": "Unknown",
+            "cik": cik,
+            "historical_annuals": [],
+            "historical_quarters": []
+        }
+
+    filings = data.get("filings", {}).get("recent", {})
+    forms = filings.get("form", [])
+    filing_dates = filings.get("filingDate", [])
+    accession_numbers = filings.get("accessionNumber", [])
+    primary_documents = filings.get("primaryDocument", [])
+
+    historical_annuals = []
+    historical_quarters = []
+    seen_years = set()
+    seen_quarters = 0
+    fallback_tags = load_fallback_tags()
+
+    for i, form in enumerate(forms):
+        if i >= len(filing_dates) or i >= len(accession_numbers) or i >= len(primary_documents):
+            continue
+
+        filing_year = filing_dates[i][:4] if filing_dates[i] else "N/A"
+        accession_number = accession_numbers[i]
+
+        if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 5:
+            seen_years.add(filing_year)
+        elif form == "10-Q" and seen_quarters < 4:
+            seen_quarters += 1
+        else:
+            continue
+
+        index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
+        xbrl_url = find_xbrl_url(index_url)
+        xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
+
+        parsed_items = extract_line_items(xbrl_text, fallback_tags) if xbrl_text else {}
+
+        filing_data = {
+            "formType": form,
+            "filingDate": filing_dates[i],
+            "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{primary_documents[i]}",
+            "xbrlUrl": xbrl_url,
+            "xbrl_text": xbrl_text,
+            "extracted": parsed_items
+        }
+
+        if form in ["10-K", "20-F"]:
+            historical_annuals.append(filing_data)
+        elif form == "10-Q":
+            historical_quarters.append(filing_data)
+
+    return {
+        "company": data.get("name", "Unknown"),
+        "cik": cik,
+        "historical_annuals": historical_annuals,
+        "historical_quarters": historical_quarters
+    }
+
+def get_company_sic_info(cik):
+    cik = cik.zfill(10)
+    url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
+    data = safe_get(url).json()
+    sic = data.get("companyInfo", {}).get("sic")
+    description = data.get("companyInfo", {}).get("sicDescription")
+    return sic, description
+
+def download_multiple_xbrl(cik, save_dir='xbrl_files'):
+    os.makedirs(save_dir, exist_ok=True)
+    filings = fetch_sec_data(cik).get("filings", {}).get("recent", {})
+    forms = filings.get("form", [])
+    accession_numbers = filings.get("accessionNumber", [])
+    filing_dates = filings.get("filingDate", [])
+
+    downloaded_files = []
+    for i, form in enumerate(forms):
+        if form not in ["10-K", "10-Q", "20-F"]:
+            continue
+        acc = accession_numbers[i]
+        date = filing_dates[i]
+        index_data = get_filing_index(cik, acc)
+        xbrl_url = find_xbrl_url(index_data)
+        if xbrl_url:
+            response = safe_get(xbrl_url)
+            filename = f"{cik}_{form}_{date}.xml"
+            filepath = os.path.join(save_dir, filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(response.text)
+            downloaded_files.append(filepath)
+    return downloaded_files
 
 @app.route("/resolve_cik", methods=["GET"])
 def resolve_cik():
