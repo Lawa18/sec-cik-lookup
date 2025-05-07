@@ -1,0 +1,89 @@
+COGS:
+- us-gaap:CostOfRevenue
+- us-gaap:CostOfRevenues
+- us-gaap:CostOfGoodsSold
+- us-gaap:CostOfGoodsAndServicesSold
+- us-gaap:CostOfSales
+- PG_CostOfGoodsSold
+CapitalExpenditures:
+- us-gaap:PaymentsToAcquirePropertyPlantAndEquipment
+- us-gaap:PurchaseOfPropertyPlantAndEquipment
+- us-gaap:PaymentsForPropertyPlantAndEquipment
+- us-gaap:CapitalExpenditurePayments
+Cash:
+- us-gaap:CashAndCashEquivalentsAtCarryingValue
+- us-gaap:CashAndCashEquivalents
+- us-gaap:CashCashEquivalentsAndShortTermInvestments
+CurrentAssets:
+- us-gaap:AssetsCurrent
+- us-gaap:CurrentAssets
+- us-gaap:CurrentAssetsAndOtherAssets
+CurrentLiabilities:
+- us-gaap:LiabilitiesCurrent
+- us-gaap:CurrentLiabilities
+EBITDA:
+- us-gaap:EBITDA
+- us-gaap:EarningsBeforeInterestTaxesDepreciationAmortization
+- us-gaap:AdjustedEBITDA
+Equity:
+- us-gaap:StockholdersEquity
+- us-gaap:Equity
+- us-gaap:EquityAttributableToOwnersOfParent
+- us-gaap:LiabilitiesAndStockholdersEquityIncludingPortionAttributableToNoncontrollingInterestMinusLiabilities
+InterestExpense:
+- us-gaap:InterestExpense
+- us-gaap:InterestAndDebtExpense
+- us-gaap:InterestIncomeExpenseNonoperatingNet
+- us-gaap:FinanceCosts
+- us-gaap:InterestExpenseDebt
+- us-gaap:InterestAndOtherDebtExpense
+- us-gaap:InterestExpenseAndFinanceCost
+Inventory:
+- us-gaap:InventoryNet
+- us-gaap:Inventories
+- us-gaap:FinishedGoods
+- us-gaap:RawMaterials
+- us-gaap:WorkInProcess
+LongTermDebt:
+- us-gaap:LongTermDebt
+- us-gaap:NoncurrentBorrowings
+- us-gaap:BorrowingsNoncurrent
+- us-gaap:DebtInstrumentNoncurrent
+NetIncome:
+- us-gaap:NetIncomeLoss
+- us-gaap:ProfitLoss
+- us-gaap:NetIncome
+OperatingCashFlow:
+- us-gaap:NetCashProvidedByUsedInOperatingActivities
+- us-gaap:NetCashFlowsFromOperatingActivities
+- us-gaap:CashFlowsFromUsedInOperatingActivities
+- us-gaap:NetCashProvidedByOperatingActivities
+OperatingIncome:
+- us-gaap:OperatingIncomeLoss
+- us-gaap:ProfitLossFromOperatingActivities
+Receivables:
+- us-gaap:AccountsReceivableNetCurrent
+- us-gaap:ReceivablesNetCurrent
+- us-gaap:TradeAndOtherReceivables
+- us-gaap:TradeReceivablesGrossCurrent
+- us-gaap:CurrentTradeReceivables
+Revenue:
+- us-gaap:Revenues
+- us-gaap:SalesRevenueNet
+- us-gaap:SalesRevenueGoodsGross
+- us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax
+- us-gaap:RevenueFromContractWithCustomerIncludingAssessedTax
+- us-gaap:RevenueFromContractWithCustomer
+- us-gaap:Revenue
+- us-gaap:RevenueFromContractsWithCustomers
+ShortTermDebt:
+- us-gaap:ShortTermBorrowings
+- us-gaap:ShorttermBorrowings
+- us-gaap:DebtCurrent
+- us-gaap:BorrowingsCurrent
+- us-gaap:DebtInstrumentCurrent
+TotalAssets:
+- us-gaap:Assets
+TotalLiabilities:
+- us-gaap:Liabilities
+- us-gaap:LiabilitiesAndStockholdersEquity
