@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from data_router import get_financial_data
-from sec_api import get_company_sic_info, download_multiple_xbrl
+from sec_api import get_company_sic_info, download_multiple_xbrl, get_sec_financials
 from upload_processor import process_uploaded_financials
 import os
 
@@ -46,21 +46,8 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        xbrl_files = download_multiple_xbrl(cik)
-        result = []
-
-        for file_path in xbrl_files:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            parts = os.path.basename(file_path).split("_")
-            result.append({
-                "company_cik": cik,
-                "form_type": parts[1] if len(parts) > 1 else "N/A",
-                "filing_date": parts[2].replace(".xml", "") if len(parts) > 2 else "N/A",
-                "xbrl_text": content
-            })
-
-        return jsonify(result)
+        financials = get_sec_financials(cik)
+        return jsonify(financials)
 
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
