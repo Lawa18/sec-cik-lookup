@@ -5,3 +5,4 @@ flask_cors
 beautifulsoup4
 lxml
 pandas
+pyyaml
