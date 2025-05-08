@@ -1,72 +1,3 @@
-COGS:
-- us-gaap:CostOfRevenue
-- us-gaap:CostOfRevenues
-- us-gaap:CostOfGoodsSold
-- us-gaap:CostOfGoodsAndServicesSold
-- us-gaap:CostOfSales
-- PG_CostOfGoodsSold
-CapitalExpenditures:
-- us-gaap:PaymentsToAcquirePropertyPlantAndEquipment
-- us-gaap:PurchaseOfPropertyPlantAndEquipment
-- us-gaap:PaymentsForPropertyPlantAndEquipment
-- us-gaap:CapitalExpenditurePayments
-Cash:
-- us-gaap:CashAndCashEquivalentsAtCarryingValue
-- us-gaap:CashAndCashEquivalents
-- us-gaap:CashCashEquivalentsAndShortTermInvestments
-CurrentAssets:
-- us-gaap:AssetsCurrent
-- us-gaap:CurrentAssets
-- us-gaap:CurrentAssetsAndOtherAssets
-CurrentLiabilities:
-- us-gaap:LiabilitiesCurrent
-- us-gaap:CurrentLiabilities
-EBITDA:
-- us-gaap:EBITDA
-- us-gaap:EarningsBeforeInterestTaxesDepreciationAmortization
-- us-gaap:AdjustedEBITDA
-Equity:
-- us-gaap:StockholdersEquity
-- us-gaap:Equity
-- us-gaap:EquityAttributableToOwnersOfParent
-- us-gaap:LiabilitiesAndStockholdersEquityIncludingPortionAttributableToNoncontrollingInterestMinusLiabilities
-InterestExpense:
-- us-gaap:InterestExpense
-- us-gaap:InterestAndDebtExpense
-- us-gaap:InterestIncomeExpenseNonoperatingNet
-- us-gaap:FinanceCosts
-- us-gaap:InterestExpenseDebt
-- us-gaap:InterestAndOtherDebtExpense
-- us-gaap:InterestExpenseAndFinanceCost
-Inventory:
-- us-gaap:InventoryNet
-- us-gaap:Inventories
-- us-gaap:FinishedGoods
-- us-gaap:RawMaterials
-- us-gaap:WorkInProcess
-LongTermDebt:
-- us-gaap:LongTermDebt
-- us-gaap:NoncurrentBorrowings
-- us-gaap:BorrowingsNoncurrent
-- us-gaap:DebtInstrumentNoncurrent
-NetIncome:
-- us-gaap:NetIncomeLoss
-- us-gaap:ProfitLoss
-- us-gaap:NetIncome
-OperatingCashFlow:
-- us-gaap:NetCashProvidedByUsedInOperatingActivities
-- us-gaap:NetCashFlowsFromOperatingActivities
-- us-gaap:CashFlowsFromUsedInOperatingActivities
-- us-gaap:NetCashProvidedByOperatingActivities
-OperatingIncome:
-- us-gaap:OperatingIncomeLoss
-- us-gaap:ProfitLossFromOperatingActivities
-Receivables:
-- us-gaap:AccountsReceivableNetCurrent
-- us-gaap:ReceivablesNetCurrent
-- us-gaap:TradeAndOtherReceivables
-- us-gaap:TradeReceivablesGrossCurrent
-- us-gaap:CurrentTradeReceivables
 Revenue:
 - us-gaap:Revenues
 - us-gaap:SalesRevenueNet
@@ -76,14 +7,122 @@ Revenue:
 - us-gaap:RevenueFromContractWithCustomer
 - us-gaap:Revenue
 - us-gaap:RevenueFromContractsWithCustomers
+- ifrs-full:Revenue
+- ifrs-full:RevenueFromContractsWithCustomers
+- custom:CompanySpecificRevenueTag
+COGS:
+- us-gaap:CostOfRevenue
+- us-gaap:CostOfRevenues
+- us-gaap:CostOfGoodsSold
+- us-gaap:CostOfGoodsAndServicesSold
+- us-gaap:CostOfSales
+- PG_CostOfGoodsSold
+- ifrs-full:CostOfSales
+- custom:CompanySpecificCOGSTag
+OperatingIncome:
+- us-gaap:OperatingIncomeLoss
+- us-gaap:ProfitLossFromOperatingActivities
+- ifrs-full:ProfitLossFromOperatingActivities
+- custom:CompanySpecificOperatingIncomeTag
+EBITDA:
+- us-gaap:EBITDA
+- us-gaap:EarningsBeforeInterestTaxesDepreciationAmortization
+- us-gaap:AdjustedEBITDA
+- ifrs-full:EarningsBeforeInterestTaxesDepreciationAmortization
+- custom:CompanySpecificEBITDATag
+InterestExpense:
+- us-gaap:InterestExpense
+- us-gaap:InterestAndDebtExpense
+- us-gaap:InterestIncomeExpenseNonoperatingNet
+- us-gaap:FinanceCosts
+- us-gaap:InterestExpenseDebt
+- us-gaap:InterestAndOtherDebtExpense
+- us-gaap:InterestExpenseAndFinanceCost
+- ifrs-full:FinanceCosts
+- custom:CompanySpecificInterestExpenseTag
+NetIncome:
+- us-gaap:NetIncomeLoss
+- us-gaap:ProfitLoss
+- us-gaap:NetIncome
+- ifrs-full:ProfitLoss
+- custom:CompanySpecificNetIncomeTag
+TotalAssets:
+- us-gaap:Assets
+- ifrs-full:Assets
+- custom:CompanySpecificTotalAssetsTag
+CurrentAssets:
+- us-gaap:AssetsCurrent
+- us-gaap:CurrentAssets
+- us-gaap:CurrentAssetsAndOtherAssets
+- ifrs-full:CurrentAssets
+- custom:CompanySpecificCurrentAssetsTag
+Cash:
+- us-gaap:CashAndCashEquivalentsAtCarryingValue
+- us-gaap:CashAndCashEquivalents
+- us-gaap:CashCashEquivalentsAndShortTermInvestments
+- ifrs-full:CashAndCashEquivalents
+- custom:CompanySpecificCashTag
+Receivables:
+- us-gaap:AccountsReceivableNetCurrent
+- us-gaap:ReceivablesNetCurrent
+- us-gaap:TradeAndOtherReceivables
+- us-gaap:TradeReceivablesGrossCurrent
+- us-gaap:CurrentTradeReceivables
+- ifrs-full:TradeAndOtherReceivables
+- custom:CompanySpecificReceivablesTag
+Inventory:
+- us-gaap:InventoryNet
+- us-gaap:Inventories
+- us-gaap:FinishedGoods
+- us-gaap:RawMaterials
+- us-gaap:WorkInProcess
+- ifrs-full:Inventories
+- custom:CompanySpecificInventoryTag
+CurrentLiabilities:
+- us-gaap:LiabilitiesCurrent
+- us-gaap:CurrentLiabilities
+- ifrs-full:CurrentLiabilities
+- custom:CompanySpecificCurrentLiabilitiesTag
 ShortTermDebt:
 - us-gaap:ShortTermBorrowings
 - us-gaap:ShorttermBorrowings
 - us-gaap:DebtCurrent
 - us-gaap:BorrowingsCurrent
 - us-gaap:DebtInstrumentCurrent
-TotalAssets:
-- us-gaap:Assets
+- ifrs-full:ShortTermBorrowings
+- custom:CompanySpecificShortTermDebtTag
+LongTermDebt:
+- us-gaap:LongTermDebt
+- us-gaap:NoncurrentBorrowings
+- us-gaap:BorrowingsNoncurrent
+- us-gaap:DebtInstrumentNoncurrent
+- ifrs-full:LongTermBorrowings
+- custom:CompanySpecificLongTermDebtTag
 TotalLiabilities:
 - us-gaap:Liabilities
 - us-gaap:LiabilitiesAndStockholdersEquity
+- ifrs-full:Liabilities
+- custom:CompanySpecificTotalLiabilitiesTag
+Equity:
+- us-gaap:StockholdersEquity
+- us-gaap:Equity
+- us-gaap:EquityAttributableToOwnersOfParent
+- us-gaap:LiabilitiesAndStockholdersEquityIncludingPortionAttributableToNoncontrollingInterestMinusLiabilities
+- ifrs-full:Equity
+- custom:CompanySpecificEquityTag
+OperatingCashFlow:
+- us-gaap:NetCashProvidedByUsedInOperatingActivities
+- us-gaap:NetCashFlowsFromOperatingActivities
+- us-gaap:CashFlowsFromUsedInOperatingActivities
+- us-gaap:NetCashProvidedByOperatingActivities
+- ifrs-full:NetCashFlowsFromOperatingActivities
+- custom:CompanySpecificOperatingCashFlowTag
+CapitalExpenditures:
+- us-gaap:PaymentsToAcquirePropertyPlantAndEquipment
+- us-gaap:PurchaseOfPropertyPlantAndEquipment
+- us-gaap:PaymentsForPropertyPlantAndEquipment
+- us-gaap:CapitalExpenditurePayments
+- ifrs-full:PaymentsForPropertyPlantAndEquipment
+- custom:CompanySpecificCapExTag
+FreeCashFlow:
+- custom:CalculatedAsOperatingCashFlowMinusCapEx
