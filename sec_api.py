@@ -4,7 +4,6 @@ import os
 import lxml.etree as ET
 import yaml
 from flask import Flask, request, jsonify
-from xbrl_parser import find_xbrl_url  # Ensure this exists
 
 app = Flask(__name__)
 
@@ -27,6 +26,18 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
             print(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(delay)
     raise Exception(f"Failed to fetch URL after {retries} attempts: {url}")
+
+def find_xbrl_url(index_data):
+    accession = index_data.get("directory", {}).get("name", "")
+    cik = index_data.get("directory", {}).get("cik", "")
+    acc_no = accession.replace('-', '')
+    xml_files = index_data.get("directory", {}).get("item", [])
+
+    for file in xml_files:
+        name = file["name"].lower()
+        if name.endswith(".xml") and not any(ex in name for ex in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
+            return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+    return None
 
 def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
     try:
@@ -111,8 +122,8 @@ def get_sec_financials(cik):
         else:
             continue
 
-        index_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/index.json"
-        xbrl_url = find_xbrl_url(index_url)
+        index_data = get_filing_index(cik, accession_number)
+        xbrl_url = find_xbrl_url(index_data)
         xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
 
         parsed_items = extract_line_items(xbrl_text, fallback_tags) if xbrl_text else {}
