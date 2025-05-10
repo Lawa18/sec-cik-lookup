@@ -29,19 +29,27 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
     raise Exception(f"❌ Failed to fetch URL after {retries} attempts: {url}")
 
 def find_xbrl_url(index_data):
-    accession = index_data.get("directory", {}).get("name", "")
-    cik = index_data.get("directory", {}).get("cik", "")
-    acc_no = accession.replace('-', '')
-    xml_files = index_data.get("directory", {}).get("item", [])
+    directory = index_data.get("directory", {})
+    cik = directory.get("cik")  # may be missing
+    accession = directory.get("name", "")
+    items = directory.get("item", [])
+    acc_no = accession.replace("-", "")
+    
+    print(f"🔎 Searching for instance XML in accession: {accession}")
 
-    for file in xml_files:
+    for file in items:
         name = file["name"].lower()
-        print(f"🔍 Checking file: {name}")
-        if name.endswith(".xml") and not any(ex in name for ex in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
-            print(f"✅ Selected XBRL instance file: {url}")
-            return url
-    print("❌ No valid instance XML found.")
+        print(f"📁 Checking file: {name}")
+        if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
+            if cik:
+                path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            else:
+                # fallback: infer cik from SEC URL path structure
+                path = f"https://www.sec.gov/Archives/edgar/data/{'/'.join(directory.get('file', '').split('/')[-3:-1])}/{file['name']}"
+            print(f"✅ Selected XBRL instance file: {path}")
+            return path
+
+    print("❌ No valid XBRL instance XML file found in filing.")
     return None
 
 def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
