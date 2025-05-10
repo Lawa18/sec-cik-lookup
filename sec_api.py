@@ -103,10 +103,15 @@ def get_sec_financials(cik):
         }
 
     filings = data.get("filings", {}).get("recent", {})
-    forms = filings.get("form", [])
-    filing_dates = filings.get("filingDate", [])
-    accession_numbers = filings.get("accessionNumber", [])
-    primary_documents = filings.get("primaryDocument", [])
+    combined = list(zip(
+        filings.get("form", []),
+        filings.get("filingDate", []),
+        filings.get("accessionNumber", []),
+        filings.get("primaryDocument", [])
+    ))
+
+    # Sort all filings by date descending
+    combined.sort(key=lambda x: x[1], reverse=True)
 
     historical_annuals = []
     historical_quarters = []
@@ -114,21 +119,17 @@ def get_sec_financials(cik):
     seen_quarters = 0
     fallback_tags = load_fallback_tags()
 
-    for i, form in enumerate(forms):
-        if i >= len(filing_dates) or i >= len(accession_numbers) or i >= len(primary_documents):
-            continue
+    for form, filing_date, accession_number, doc in combined:
+        filing_year = filing_date[:4] if filing_date else "N/A"
 
-        filing_year = filing_dates[i][:4] if filing_dates[i] else "N/A"
-        accession_number = accession_numbers[i]
-
-        if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 5:
+        if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 2:
             seen_years.add(filing_year)
-        elif form == "10-Q" and seen_quarters < 4:
+        elif form == "10-Q" and seen_quarters < 3:
             seen_quarters += 1
         else:
             continue
 
-        print(f"📄 Processing {form} from {filing_dates[i]}")
+        print(f"📄 Processing {form} from {filing_date}")
         index_data = get_filing_index(cik, accession_number)
         xbrl_url = find_xbrl_url(index_data)
         xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
@@ -136,8 +137,8 @@ def get_sec_financials(cik):
 
         filing_data = {
             "formType": form,
-            "filingDate": filing_dates[i],
-            "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{primary_documents[i]}",
+            "filingDate": filing_date,
+            "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}",
             "xbrlUrl": xbrl_url,
             "xbrl_text": xbrl_text,
             "extracted": parsed_items
