@@ -19,13 +19,14 @@ SEC_API_BASE = 'https://data.sec.gov'
 def safe_get(url, headers=HEADERS, retries=3, delay=1):
     for attempt in range(retries):
         try:
+            print(f"🔗 Fetching: {url}")
             response = requests.get(url, headers=headers)
             response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
+            print(f"⚠️ Attempt {attempt + 1} failed: {e}")
             time.sleep(delay)
-    raise Exception(f"Failed to fetch URL after {retries} attempts: {url}")
+    raise Exception(f"❌ Failed to fetch URL after {retries} attempts: {url}")
 
 def find_xbrl_url(index_data):
     accession = index_data.get("directory", {}).get("name", "")
@@ -35,8 +36,12 @@ def find_xbrl_url(index_data):
 
     for file in xml_files:
         name = file["name"].lower()
+        print(f"🔍 Checking file: {name}")
         if name.endswith(".xml") and not any(ex in name for ex in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            print(f"✅ Selected XBRL instance file: {url}")
+            return url
+    print("❌ No valid instance XML found.")
     return None
 
 def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
@@ -65,14 +70,15 @@ def extract_line_items(xbrl_text, fallback_tags):
                 extracted[metric] = "Missing tag"
     except Exception as e:
         print(f"❌ XBRL Parse error: {e}")
+    print(f"📊 Extracted {len(extracted)} metrics.")
     return extracted
 
 def fetch_sec_data(cik):
     sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
     try:
-        sec_response = requests.get(sec_url, headers=HEADERS, timeout=10)
-        sec_response.raise_for_status()
-        return sec_response.json()
+        res = requests.get(sec_url, headers=HEADERS, timeout=10)
+        res.raise_for_status()
+        return res.json()
     except requests.RequestException as e:
         print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
         return {}
@@ -122,10 +128,10 @@ def get_sec_financials(cik):
         else:
             continue
 
+        print(f"📄 Processing {form} from {filing_dates[i]}")
         index_data = get_filing_index(cik, accession_number)
         xbrl_url = find_xbrl_url(index_data)
         xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
-
         parsed_items = extract_line_items(xbrl_text, fallback_tags) if xbrl_text else {}
 
         filing_data = {
