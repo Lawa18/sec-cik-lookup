@@ -4,6 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 from flask import Flask, request, jsonify
+from extract_line_items_from_ixbrl import extract_line_items_from_ixbrl
 
 app = Flask(__name__)
 
@@ -30,13 +31,12 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
 
 def find_xbrl_url(index_data):
     directory = index_data.get("directory", {})
-    cik = directory.get("cik")  # may be missing
+    cik = directory.get("cik")
     accession = directory.get("name", "")
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
     
     print(f"🔎 Searching for instance XML in accession: {accession}")
-
     for file in items:
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
@@ -44,11 +44,9 @@ def find_xbrl_url(index_data):
             if cik:
                 path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
             else:
-                # fallback: infer cik from SEC URL path structure
                 path = f"https://www.sec.gov/Archives/edgar/data/{'/'.join(directory.get('file', '').split('/')[-3:-1])}/{file['name']}"
             print(f"✅ Selected XBRL instance file: {path}")
             return path
-
     print("❌ No valid XBRL instance XML file found in filing.")
     return None
 
@@ -118,9 +116,7 @@ def get_sec_financials(cik):
         filings.get("primaryDocument", [])
     ))
 
-    # Sort all filings by date descending
     combined.sort(key=lambda x: x[1], reverse=True)
-
     historical_annuals = []
     historical_quarters = []
     seen_years = set()
@@ -140,8 +136,18 @@ def get_sec_financials(cik):
         print(f"📄 Processing {form} from {filing_date}")
         index_data = get_filing_index(cik, accession_number)
         xbrl_url = find_xbrl_url(index_data)
-        xbrl_text = safe_get(xbrl_url).text if xbrl_url else None
-        parsed_items = extract_line_items(xbrl_text, fallback_tags) if xbrl_text else {}
+
+        xbrl_text = None
+        parsed_items = {}
+        if xbrl_url and xbrl_url.endswith(".xml"):
+            xbrl_text = safe_get(xbrl_url).text
+            parsed_items = extract_line_items(xbrl_text, fallback_tags)
+        elif doc.endswith(".htm") or doc.endswith(".html"):
+            htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
+            print(f"🌐 Falling back to iXBRL HTML: {htm_url}")
+            htm_text = safe_get(htm_url).text
+            xbrl_text = htm_text
+            parsed_items = extract_line_items_from_ixbrl(htm_text, fallback_tags)
 
         filing_data = {
             "formType": form,
