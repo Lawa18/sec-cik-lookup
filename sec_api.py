@@ -167,6 +167,12 @@ def get_sec_financials(cik):
         reverse=True
     )[:2]
 
+        print("🔍 Extracted values for debugging:")
+    for filing in historical_annuals:
+        print(f"\n🗂️ Filing: {filing['filingDate']} – Form {filing['formType']}")
+    for k, v in filing["extracted"].items():
+        print(f"{k}: {v}")
+
     return {
         "company": data.get("name", "Unknown"),
         "cik": cik,
