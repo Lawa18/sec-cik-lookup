@@ -3,6 +3,7 @@ import time
 import os
 import lxml.etree as ET
 import yaml
+import re
 from flask import Flask, request, jsonify
 from extract_line_items_from_ixbrl import extract_line_items_from_ixbrl
 
@@ -79,6 +80,12 @@ def extract_line_items(xbrl_text, fallback_tags):
     print(f"📊 Extracted {len(extracted)} metrics.")
     return extracted
 
+def get_fiscal_year_from_xbrl(xbrl_text):
+    match = re.search(r'<[^>]*DocumentPeriodEndDate[^>]*>(\d{4})-\d{2}-\d{2}</', xbrl_text)
+    if match:
+        return match.group(1)
+    return None
+
 def fetch_sec_data(cik):
     sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
     try:
@@ -117,57 +124,54 @@ def get_sec_financials(cik):
     ))
 
     combined.sort(key=lambda x: x[1], reverse=True)
-    historical_annuals = []
-    historical_quarters = []
-    seen_years = set()
-    seen_quarters = 0
     fallback_tags = load_fallback_tags()
+    all_annuals = []
 
     for form, filing_date, accession_number, doc in combined:
-        filing_year = filing_date[:4] if filing_date else "N/A"
-
-        if form in ["10-K", "20-F"] and filing_year not in seen_years and len(seen_years) < 2:
-            seen_years.add(filing_year)
-        elif form == "10-Q" and seen_quarters < 3:
-            seen_quarters += 1
-        else:
+        if form not in ["10-K", "20-F"]:
             continue
 
-        print(f"📄 Processing {form} from {filing_date}")
+        print(f"📄 Checking {form} filed on {filing_date}")
         index_data = get_filing_index(cik, accession_number)
         xbrl_url = find_xbrl_url(index_data)
 
         xbrl_text = None
         parsed_items = {}
+
         if xbrl_url and xbrl_url.endswith(".xml"):
             xbrl_text = safe_get(xbrl_url).text
             parsed_items = extract_line_items(xbrl_text, fallback_tags)
         elif doc.endswith(".htm") or doc.endswith(".html"):
             htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
-            print(f"🌐 Falling back to iXBRL HTML: {htm_url}")
+            print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
             parsed_items = extract_line_items_from_ixbrl(htm_text, fallback_tags)
 
-        filing_data = {
+        fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
+        print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
+
+        all_annuals.append({
             "formType": form,
             "filingDate": filing_date,
+            "fiscalYear": fiscal_year,
             "filingUrl": f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}",
             "xbrlUrl": xbrl_url,
             "xbrl_text": xbrl_text,
             "extracted": parsed_items
-        }
+        })
 
-        if form in ["10-K", "20-F"]:
-            historical_annuals.append(filing_data)
-        elif form == "10-Q":
-            historical_quarters.append(filing_data)
+    historical_annuals = sorted(
+        [f for f in all_annuals if f["fiscalYear"]],
+        key=lambda x: x["fiscalYear"],
+        reverse=True
+    )[:2]
 
     return {
         "company": data.get("name", "Unknown"),
         "cik": cik,
         "historical_annuals": historical_annuals,
-        "historical_quarters": historical_quarters
+        "historical_quarters": []
     }
 
 def get_company_sic_info(cik):
