@@ -46,8 +46,8 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        # ✅ Return the same response structure used by /financials
-        return jsonify(get_sec_financials(cik))
+        result = get_sec_financials(cik)
+        return jsonify(result.get("historical_annuals", []))
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
         return jsonify({"error": str(e)}), 500
