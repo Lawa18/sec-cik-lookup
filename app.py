@@ -50,11 +50,9 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        print(f"📘 Calling get_sec_financials for CIK: {cik}")
         financials = get_sec_financials(cik)
         combined = financials.get("historical_annuals", []) + financials.get("historical_quarters", [])
-        print(f"📦 Returning {len(combined)} filings")
-        return jsonify(combined), 200
+        return jsonify(combined)
 
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
