@@ -6,6 +6,10 @@ import os
 
 app = Flask(__name__)
 
+@app.route("/", methods=["GET"])
+def health_check():
+    return "✅ SEC API backend is running!", 200
+
 @app.route("/financials", methods=["GET"])
 def financials():
     query = request.args.get("query", "").strip().lower()
@@ -46,11 +50,16 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        result = get_sec_financials(cik)
-        return jsonify(result.get("historical_annuals", []))
+        print(f"📘 Calling get_sec_financials for CIK: {cik}")
+        financials = get_sec_financials(cik)
+        combined = financials.get("historical_annuals", []) + financials.get("historical_quarters", [])
+        print(f"📦 Returning {len(combined)} filings")
+        return jsonify(combined), 200
+
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
