@@ -46,22 +46,11 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        downloaded_files = download_multiple_xbrl(cik)
-        response = []
-
-        for filepath in downloaded_files:
-            with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
-            parts = os.path.basename(filepath).split("_")
-            response.append({
-                "company_cik": cik,
-                "form_type": parts[1] if len(parts) > 1 else "N/A",
-                "filing_date": parts[2].replace(".xml", "") if len(parts) > 2 else "N/A",
-                "xbrl_url": "local file",
-                "xbrl_text": content
-            })
-
-        return jsonify(response)
+        # ✅ Use real-time financial extraction from XML + iXBRL
+        result = get_sec_financials(cik)
+        filings = result.get("historical_annuals", []) + result.get("historical_quarters", [])
+        print(f"📄 Returning {len(filings)} filings from get_sec_financials()")
+        return jsonify(filings)
 
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
