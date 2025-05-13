@@ -46,11 +46,8 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        # ✅ This pulls structured XBRL + extracted data
-        financials = get_sec_financials(cik)
-        combined = financials.get("historical_annuals", []) + financials.get("historical_quarters", [])
-        return jsonify(combined)
-
+        # ✅ Return the same response structure used by /financials
+        return jsonify(get_sec_financials(cik))
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
         return jsonify({"error": str(e)}), 500
