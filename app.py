@@ -46,11 +46,10 @@ def get_multiple_xbrl():
         return jsonify({"error": "CIK parameter is required"}), 400
 
     try:
-        # ✅ Use real-time financial extraction from XML + iXBRL
-        result = get_sec_financials(cik)
-        filings = result.get("historical_annuals", []) + result.get("historical_quarters", [])
-        print(f"📄 Returning {len(filings)} filings from get_sec_financials()")
-        return jsonify(filings)
+        # ✅ This pulls structured XBRL + extracted data
+        financials = get_sec_financials(cik)
+        combined = financials.get("historical_annuals", []) + financials.get("historical_quarters", [])
+        return jsonify(combined)
 
     except Exception as e:
         print(f"❌ Error in get_multiple_xbrl: {e}")
