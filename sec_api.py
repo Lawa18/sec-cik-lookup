@@ -32,10 +32,11 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
 
 def find_xbrl_url(index_data):
     directory = index_data.get("directory", {})
-    cik = directory.get("cik")  # may be None
+    cik = directory.get("cik")  # Might be None
     accession = directory.get("name", "")
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
+    base_path = "/".join(directory.get("file", "").split("/")[-3:-1])  # fallback
 
     print(f"🔎 Searching for instance XML in accession: {accession}")
     for file in items:
@@ -43,18 +44,13 @@ def find_xbrl_url(index_data):
         print(f"📁 Checking file: {name}")
         if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
             try:
-                if cik is not None:
-                    path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
-                else:
-                    # fallback: parse CIK from fallback URL
-                    inferred_path = index_data.get("directory", {}).get("file", "")
-                    parts = inferred_path.split("/")
-                    cik_guess = parts[-3] if len(parts) >= 3 else "unknown"
-                    path = f"https://www.sec.gov/Archives/edgar/data/{cik_guess}/{acc_no}/{file['name']}"
+                # ✅ Robust fallback if cik is None
+                cik_path = f"{int(cik)}/{acc_no}" if cik else base_path
+                path = f"https://www.sec.gov/Archives/edgar/data/{cik_path}/{file['name']}"
                 print(f"✅ Selected XBRL instance file: {path}")
                 return path
-            except KeyError:
-                print("❌ Could not construct XBRL URL from item['href']")
+            except Exception as e:
+                print(f"❌ Could not construct XBRL URL: {e}")
                 return None
     print("❌ No valid XBRL instance XML file found in filing.")
     return None
