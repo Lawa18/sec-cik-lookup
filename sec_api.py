@@ -32,7 +32,7 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
 
 def find_xbrl_url(index_data):
     directory = index_data.get("directory", {})
-    cik = directory.get("cik")
+    cik = directory.get("cik")  # may be None
     accession = directory.get("name", "")
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
@@ -42,10 +42,20 @@ def find_xbrl_url(index_data):
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
         if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            if "name" in file:
-                path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            try:
+                if cik is not None:
+                    path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+                else:
+                    # fallback: parse CIK from fallback URL
+                    inferred_path = index_data.get("directory", {}).get("file", "")
+                    parts = inferred_path.split("/")
+                    cik_guess = parts[-3] if len(parts) >= 3 else "unknown"
+                    path = f"https://www.sec.gov/Archives/edgar/data/{cik_guess}/{acc_no}/{file['name']}"
                 print(f"✅ Selected XBRL instance file: {path}")
                 return path
+            except KeyError:
+                print("❌ Could not construct XBRL URL from item['href']")
+                return None
     print("❌ No valid XBRL instance XML file found in filing.")
     return None
 
