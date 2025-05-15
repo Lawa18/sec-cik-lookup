@@ -32,19 +32,22 @@ def safe_get(url, headers=HEADERS, retries=3, delay=1):
 
 def find_xbrl_url(index_data):
     directory = index_data.get("directory", {})
-    cik = directory.get("cik")  # Might be None
+    cik = directory.get("cik")
     accession = directory.get("name", "")
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
-    base_path = "/".join(directory.get("file", "").split("/")[-3:-1])  # fallback
+    base_path = "/".join(directory.get("file", "").split("/")[-3:-1])  # fallback path
 
     print(f"🔎 Searching for instance XML in accession: {accession}")
     for file in items:
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
-        if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
+        if (
+            name.endswith(".xml") and
+            not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema", "filingsummary"])
+        ):
             try:
-                # ✅ Robust fallback if cik is None
+                # Fallback if CIK is missing
                 cik_path = f"{int(cik)}/{acc_no}" if cik else base_path
                 path = f"https://www.sec.gov/Archives/edgar/data/{cik_path}/{file['name']}"
                 print(f"✅ Selected XBRL instance file: {path}")
