@@ -42,10 +42,13 @@ def find_xbrl_url(index_data):
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
         if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            if cik:
-                path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
-            else:
-                path = f"https://www.sec.gov/Archives/edgar/data/{'/'.join(directory.get('file', '').split('/')[-3:-1])}/{file['name']}"
+            try:
+    path = f"https://www.sec.gov/Archives/{file['href']}"
+    print(f"✅ Selected XBRL instance file: {path}")
+    return path
+    except KeyError:
+    print("❌ Could not construct XBRL URL from item['href']")
+    return None
             print(f"✅ Selected XBRL instance file: {path}")
             return path
     print("❌ No valid XBRL instance XML file found in filing.")
