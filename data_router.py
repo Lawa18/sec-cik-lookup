@@ -19,8 +19,17 @@ def load_cik_mappings():
 def get_financial_data(query):
     """Fetches financial data using the correct CIK mapping."""
     cik_by_ticker, cik_by_company = load_cik_mappings()
-    
-    cik = cik_by_ticker.get(query.lower()) or cik_by_company.get(query.lower())
+    query_lc = query.lower().strip()
+
+    # Exact match by ticker or company name
+    cik = cik_by_ticker.get(query_lc) or cik_by_company.get(query_lc)
+
+    # Fuzzy fallback: partial match against known company names
+    if not cik:
+        for name, value in cik_by_company.items():
+            if query_lc in name:
+                cik = value
+                break
 
     if not cik:
         return {
@@ -30,4 +39,3 @@ def get_financial_data(query):
 
     from sec_api import get_sec_financials
     return get_sec_financials(cik)
-
