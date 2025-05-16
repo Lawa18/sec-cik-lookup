@@ -36,12 +36,8 @@ def find_xbrl_url(index_data):
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
 
-    # Fallback if cik is missing
-    path_parts = directory.get("file", "").split("/")
-    try:
-        cik_fallback = path_parts[-3]
-    except IndexError:
-        cik_fallback = "unknown"
+    # Safely derive CIK if not present
+    cik_fallback = directory.get("cik") or directory.get("file", "").split("/")[-3]
 
     print(f"🔎 Searching for instance XML in accession: {accession}")
     for file in items:
