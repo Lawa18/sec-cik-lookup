@@ -36,21 +36,28 @@ def find_xbrl_url(index_data):
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
 
-    # Safely derive CIK if not present
-    cik_fallback = directory.get("cik") or directory.get("file", "").split("/")[-3]
+    # Fallback-safe cik extraction
+    cik = directory.get("cik")
+    if not cik:
+        file_path = directory.get("file", "")
+        parts = file_path.split("/")
+        if len(parts) >= 3:
+            cik = parts[-3]
+            print(f"🧩 Recovered missing CIK from file path: {cik}")
+        else:
+            print("❌ Cannot determine CIK — directory['file'] is malformed or missing.")
+            return None
 
     print(f"🔎 Searching for instance XML in accession: {accession}")
+
     for file in items:
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
-        if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema", "filingsummary"]):
-            try:
-                path = f"https://www.sec.gov/Archives/edgar/data/{cik_fallback}/{acc_no}/{file['name']}"
-                print(f"✅ Selected XBRL instance file: {path}")
-                return path
-            except Exception as e:
-                print(f"❌ Could not construct XBRL URL: {e}")
-                return None
+        if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
+            path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            print(f"✅ Selected XBRL instance file: {path}")
+            return path
+
     print("❌ No valid XBRL instance XML file found in filing.")
     return None
 
