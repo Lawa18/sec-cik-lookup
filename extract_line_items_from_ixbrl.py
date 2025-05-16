@@ -1,8 +1,8 @@
-from bs4 import BeautifulSoup
-import warnings
-from bs4 import XMLParsedAsHTMLWarning
-
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
+    from bs4 import BeautifulSoup
+    import warnings
+    from bs4 import XMLParsedAsHTMLWarning
+
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
     soup = BeautifulSoup(htm_text, "lxml")
 
@@ -10,17 +10,15 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
 
     for metric, tags in fallback_tags.items():
         found = False
-        for tag in tags:
-            tag_name = tag.split(":")[-1]
-            # Match any tag with matching name attribute (ignores prefix issues)
+        for full_tag in tags:
+            tag_name = full_tag.split(":")[-1]
             candidates = soup.find_all(attrs={"name": tag_name})
-            for el in candidates:
-                text = el.get_text(strip=True)
-                if text:
+            for tag in candidates:
+                if tag.string and tag.string.strip():
                     try:
-                        extracted[metric] = float(text.replace(",", "").replace("(", "-").replace(")", ""))
+                        extracted[metric] = float(tag.string.replace(",", "").replace("(", "-").replace(")", ""))
                     except:
-                        extracted[metric] = text
+                        extracted[metric] = tag.string.strip()
                     found = True
                     break
             if found:
@@ -28,5 +26,5 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
         if not found:
             extracted[metric] = "Missing tag"
 
-    print(f"🌐 Extracted {len(extracted)} iXBRL metrics.")
+    print(f"🧠 Extracted {len(extracted)} fields from iXBRL.")
     return extracted
