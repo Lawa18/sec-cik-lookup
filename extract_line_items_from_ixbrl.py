@@ -1,32 +1,26 @@
-from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from bs4 import BeautifulSoup
 import warnings
 
-warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
-    try:
-        soup = BeautifulSoup(htm_text, "lxml")
-    except Exception as e:
-        print(f"⚠️ LXML failed, retrying with html.parser: {e}")
-        soup = BeautifulSoup(htm_text, "html.parser")
+    # Use robust HTML parser instead of lxml (to prevent crashes)
+    soup = BeautifulSoup(htm_text, "html.parser")
 
     extracted = {}
+
     for metric, tag_names in fallback_tags.items():
         found = False
-        for tag in soup.find_all(["ix:nonfraction", "ix:nonnumeric"]):
-            if not hasattr(tag, "attrs") or "name" not in tag.attrs:
-                continue
-
-            tag_name_attr = tag["name"].lower()
-            for fallback_tag in tag_names:
-                if fallback_tag.lower() in tag_name_attr:
-                    val = tag.get_text(strip=True).replace(",", "").replace("(", "-").replace(")", "")
-                    try:
-                        extracted[metric] = float(val) if val.replace(".", "", 1).isdigit() else val
-                    except:
-                        extracted[metric] = val
-                    found = True
-                    break
+        for tag in soup.find_all(True):  # True returns all tags
+            if tag.name and tag.name.lower() in ["ix:nonfraction", "ix:nonnumeric"]:
+                tag_name_attr = tag.get("name", "").lower()
+                for fallback_tag in tag_names:
+                    if fallback_tag.lower() in tag_name_attr:
+                        val = tag.get_text(strip=True).replace(",", "").replace("(", "-").replace(")", "")
+                        try:
+                            extracted[metric] = float(val) if val.replace(".", "", 1).isdigit() else val
+                        except:
+                            extracted[metric] = val
+                        found = True
+                        break
             if found:
                 break
         if not found:
