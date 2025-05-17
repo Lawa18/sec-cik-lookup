@@ -17,7 +17,7 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
             tag_name = full_tag.split(":")[-1]
             try:
                 # ✅ Safe generator catch block
-                candidates = soup.find_all(attrs={"name": tag_name})
+                candidates = soup.find_all(attrs={"name": tag_name}, limit=1000)
                 candidates = list(candidates)  # materialize to avoid generator crashes
             except Exception as e:
                 print(f"⚠️ iXBRL tag search failed for '{tag_name}': {e}")
