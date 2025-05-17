@@ -10,8 +10,9 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
     for metric, tag_names in fallback_tags.items():
         found = False
         for tag in soup.descendants:
-            if not hasattr(tag, "name"):
+            if not hasattr(tag, "name") or tag.name is None:
                 continue
+
             tagname = tag.name.lower()
             if tagname not in ["ix:nonfraction", "ix:nonnumeric"]:
                 continue
