@@ -16,19 +16,27 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
         for full_tag in tags:
             tag_name = full_tag.split(":")[-1]
             try:
+                # ✅ Safe generator catch block
                 candidates = soup.find_all(attrs={"name": tag_name})
-                for tag in candidates:
+                candidates = list(candidates)  # materialize to avoid generator crashes
+            except Exception as e:
+                print(f"⚠️ iXBRL tag search failed for '{tag_name}': {e}")
+                continue
+
+            for tag in candidates:
+                try:
                     if tag.string and tag.string.strip():
+                        text = tag.string.strip()
                         try:
-                            extracted[metric] = float(tag.string.replace(",", "").replace("(", "-").replace(")", ""))
+                            extracted[metric] = float(text.replace(",", "").replace("(", "-").replace(")", ""))
                         except:
-                            extracted[metric] = tag.string.strip()
+                            extracted[metric] = text
                         found = True
                         break
-                if found:
-                    break
-            except Exception as e:
-                print(f"⚠️ iXBRL tag extraction failed for {tag_name}: {e}")
+                except Exception as inner_e:
+                    print(f"⚠️ Error parsing tag for {metric}: {inner_e}")
+            if found:
+                break
         if not found:
             extracted[metric] = "Missing tag"
 
