@@ -175,7 +175,8 @@ def get_sec_financials(cik):
         [f for f in all_annuals if f["fiscalYear"]],
         key=lambda x: x["fiscalYear"],
         reverse=True
-    )[:2]
+    )[:1]  # Only 1 filing to stay within memory limits
+
 
     print("🔍 Extracted values for debugging:")
     for filing in historical_annuals:
