@@ -4,32 +4,31 @@ import warnings
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
-    soup = BeautifulSoup(htm_text, "lxml")
-    extracted = {}
+    try:
+        soup = BeautifulSoup(htm_text, "lxml")
+    except Exception as e:
+        print(f"⚠️ LXML failed, retrying with html.parser: {e}")
+        soup = BeautifulSoup(htm_text, "html.parser")
 
+    extracted = {}
     for metric, tag_names in fallback_tags.items():
         found = False
-        for tag in soup.descendants:
-            if not hasattr(tag, "name") or tag.name is None:
+        for tag in soup.find_all(["ix:nonfraction", "ix:nonnumeric"]):
+            if not hasattr(tag, "attrs") or "name" not in tag.attrs:
                 continue
 
-            tagname = tag.name.lower()
-            if tagname not in ["ix:nonfraction", "ix:nonnumeric"]:
-                continue
-
-            name_attr = tag.get("name", "").lower()
-            for fallback in tag_names:
-                if fallback.lower() in name_attr:
+            tag_name_attr = tag["name"].lower()
+            for fallback_tag in tag_names:
+                if fallback_tag.lower() in tag_name_attr:
+                    val = tag.get_text(strip=True).replace(",", "").replace("(", "-").replace(")", "")
                     try:
-                        val = tag.text.strip().replace(",", "").replace("(", "-").replace(")", "")
                         extracted[metric] = float(val) if val.replace(".", "", 1).isdigit() else val
-                        found = True
-                        break
-                    except Exception:
-                        continue
+                    except:
+                        extracted[metric] = val
+                    found = True
+                    break
             if found:
                 break
-
         if not found:
             extracted[metric] = "Missing tag"
 
