@@ -6,6 +6,18 @@ import yaml
 import re
 from ixbrl_parser import parse_ixbrl_metrics  # ✅ updated import
 
+def safe_get(url, headers=HEADERS, retries=3, delay=1):
+    for attempt in range(retries):
+        try:
+            print(f"🔗 Fetching: {url}")
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Attempt {attempt + 1} failed: {e}")
+            time.sleep(delay)
+    raise Exception(f"❌ Failed to fetch URL after {retries} attempts: {url}")
+
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
     'Accept-Encoding': 'gzip, deflate',
