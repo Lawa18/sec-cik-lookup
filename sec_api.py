@@ -6,6 +6,9 @@ import yaml
 import re
 from ixbrl_parser import parse_ixbrl_and_extract  # ✅ final import
 
+print("✅ ixbrl_parser imported successfully:", parse_ixbrl_and_extract)
+assert callable(parse_ixbrl_and_extract), "❌ Function is not callable"
+
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
     'Accept-Encoding': 'gzip, deflate',
