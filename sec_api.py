@@ -15,7 +15,15 @@ HEADERS = {
 
 SEC_API_BASE = 'https://data.sec.gov'
 
-# ... [no changes to the rest of the file until get_sec_financials]
+def fetch_sec_data(cik):
+    sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
+    try:
+        res = requests.get(sec_url, headers=HEADERS, timeout=10)
+        res.raise_for_status()
+        return res.json()
+    except requests.RequestException as e:
+        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
+        return {}
 
 def get_sec_financials(cik):
     assert callable(parse_ixbrl_metrics), "❌ parse_ixbrl_metrics is not callable"  # ✅ defense
@@ -96,7 +104,7 @@ def get_sec_financials(cik):
         "historical_quarters": []
     }
 
-# ... [rest of sec_api.py unchanged]
+# ... [rest unchanged]
 
 def get_company_sic_info(cik):
     cik = cik.zfill(10)
