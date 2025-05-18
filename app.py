@@ -18,14 +18,25 @@ def financials():
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
 
-    result = get_financial_data(query)
+    try:
+        result = get_financial_data(query)
+        print(f"✅ get_financial_data() completed for query: {query}")
+    except Exception as e:
+        print(f"❌ Exception during get_financial_data(): {e}")
+        return jsonify({"error": "Internal error fetching financials."}), 500
 
     cik = result.get("cik")
     if cik:
-        sic_code, sic_description = get_company_sic_info(cik)
-        result["sic_code"] = str(sic_code) if sic_code else "N/A"
-        result["sic_description"] = sic_description if sic_description else "N/A"
+        try:
+            sic_code, sic_description = get_company_sic_info(cik)
+            result["sic_code"] = str(sic_code) if sic_code else "N/A"
+            result["sic_description"] = sic_description if sic_description else "N/A"
+        except Exception as e:
+            print(f"⚠️ Failed to retrieve SIC info for CIK {cik}: {e}")
+            result["sic_code"] = "N/A"
+            result["sic_description"] = "N/A"
     else:
+        print("⚠️ No CIK found — skipping SIC enrichment.")
         result["sic_code"] = "N/A"
         result["sic_description"] = "N/A"
 
