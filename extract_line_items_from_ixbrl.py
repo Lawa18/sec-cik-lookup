@@ -3,14 +3,12 @@ import warnings
 
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-    
-    # Only use from_encoding if htm_text is bytes
-    if isinstance(htm_text, bytes):
-        soup = BeautifulSoup(htm_text, "lxml", from_encoding="utf-8")
-    else:
-        soup = BeautifulSoup(htm_text, "lxml")  # safer for unicode
-    
+
+    # ✅ html5lib handles broken/massive iXBRL better than lxml
+    soup = BeautifulSoup(htm_text, "html5lib")
+
     extracted = {}
+
     for metric, tag_names in fallback_tags.items():
         found = False
         for tag in soup.find_all(True):
