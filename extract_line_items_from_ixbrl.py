@@ -3,22 +3,23 @@ import warnings
 
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-    soup = BeautifulSoup(htm_text, "lxml")  # Use lxml to avoid HTMLParser crash
+    soup = BeautifulSoup(htm_text, "lxml", from_encoding="utf-8")
 
     extracted = {}
 
     for metric, tag_names in fallback_tags.items():
         found = False
-        for tag in soup.find_all(True):  # Iterate all tags
-            if tag.name and "non" in tag.name.lower():  # covers ix:nonFraction, ix:nonNumeric
+        for tag in soup.find_all(True):
+            if tag.name and "non" in tag.name.lower():  # catches ix:nonFraction/nonnumeric
                 name_attr = tag.get("name", "").lower()
                 for fallback_tag in tag_names:
                     if fallback_tag.lower() in name_attr:
-                        value = tag.get_text(strip=True).replace(",", "").replace("(", "-").replace(")", "")
+                        text = tag.get_text(strip=True)
+                        text = text.replace(",", "").replace("(", "-").replace(")", "")
                         try:
-                            extracted[metric] = float(value)
+                            extracted[metric] = float(text)
                         except:
-                            extracted[metric] = value
+                            extracted[metric] = text
                         found = True
                         break
             if found:
