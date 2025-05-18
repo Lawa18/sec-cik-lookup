@@ -6,3 +6,4 @@ beautifulsoup4
 lxml
 pandas
 pyyaml
+html5lib
