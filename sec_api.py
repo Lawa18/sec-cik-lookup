@@ -4,7 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from extract_line_items_from_ixbrl import parse_ixbrl_and_extract  # ✅ final import name check
+from ixbrl_parser import parse_ixbrl_metrics  # ✅ updated import
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
@@ -15,103 +15,10 @@ HEADERS = {
 
 SEC_API_BASE = 'https://data.sec.gov'
 
-def safe_get(url, headers=HEADERS, retries=3, delay=1):
-    for attempt in range(retries):
-        try:
-            print(f"🔗 Fetching: {url}")
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            return response
-        except requests.exceptions.RequestException as e:
-            print(f"⚠️ Attempt {attempt + 1} failed: {e}")
-            time.sleep(delay)
-    raise Exception(f"❌ Failed to fetch URL after {retries} attempts: {url}")
-
-def find_xbrl_url(index_data):
-    directory = index_data.get("directory", {})
-    accession = directory.get("name", "")
-    items = directory.get("item", [])
-    acc_no = accession.replace("-", "")
-
-    cik_fallback = directory.get("cik")
-    if not cik_fallback:
-        file_path = directory.get("file", "")
-        cik_parts = file_path.split("/")
-        cik_fallback = cik_parts[-3] if len(cik_parts) >= 3 else None
-
-    if not cik_fallback:
-        print("❌ Cannot determine CIK — directory['file'] is malformed or missing.")
-        return None
-
-    print(f"🔎 Searching for instance XML in accession: {accession}")
-
-    for file in items:
-        name = file["name"].lower()
-        print(f"📁 Checking file: {name}")
-        if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            path = f"https://www.sec.gov/Archives/edgar/data/{int(cik_fallback)}/{acc_no}/{file['name']}"
-            print(f"✅ Selected XBRL instance file: {path}")
-            return path
-
-    print("❌ No valid XBRL instance XML file found in filing.")
-    return None
-
-def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
-    try:
-        with open(filepath, "r") as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        print(f"❌ Failed to load fallback tags: {e}")
-        return {}
-
-def extract_line_items(xbrl_text, fallback_tags):
-    extracted = {}
-    try:
-        root = ET.fromstring(xbrl_text.encode("utf-8"))
-        for metric, tags in fallback_tags.items():
-            for tag in tags:
-                local_tag = tag.split(":")[-1]
-                el = root.find(f".//{{*}}{local_tag}")
-                if el is not None and el.text and el.text.strip():
-                    try:
-                        extracted[metric] = float(el.text.replace(",", "").replace("(", "-").replace(")", ""))
-                    except:
-                        extracted[metric] = el.text.strip()
-                    break
-            else:
-                extracted[metric] = "Missing tag"
-    except Exception as e:
-        print(f"❌ XBRL Parse error: {e}")
-    print(f"📊 Extracted {len(extracted)} metrics.")
-    return extracted
-
-def get_fiscal_year_from_xbrl(xbrl_text):
-    match = re.search(r'<[^>]*DocumentPeriodEndDate[^>]*>(\d{4})-\d{2}-\d{2}</', xbrl_text)
-    if match:
-        return match.group(1)
-    return None
-
-def fetch_sec_data(cik):
-    sec_url = f"{SEC_API_BASE}/submissions/CIK{cik}.json"
-    try:
-        res = requests.get(sec_url, headers=HEADERS, timeout=10)
-        res.raise_for_status()
-        return res.json()
-    except requests.RequestException as e:
-        print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
-        return {}
-
-def get_filing_index(cik, accession):
-    acc_no_no_hyphens = accession.replace('-', '')
-    url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no_no_hyphens}/index.json"
-    try:
-        return safe_get(url).json()
-    except Exception:
-        fallback_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/index.json"
-        return safe_get(fallback_url).json()
+# ... [no changes to the rest of the file until get_sec_financials]
 
 def get_sec_financials(cik):
-    assert callable(parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"  # ✅ defense
+    assert callable(parse_ixbrl_metrics), "❌ parse_ixbrl_metrics is not callable"  # ✅ defense
 
     data = fetch_sec_data(cik)
     if not data:
@@ -155,7 +62,7 @@ def get_sec_financials(cik):
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
 
-            parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)
+            parsed_items = parse_ixbrl_metrics(htm_text, fallback_tags)  # ✅ updated usage
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
@@ -188,6 +95,8 @@ def get_sec_financials(cik):
         "historical_annuals": historical_annuals,
         "historical_quarters": []
     }
+
+# ... [rest of sec_api.py unchanged]
 
 def get_company_sic_info(cik):
     cik = cik.zfill(10)
