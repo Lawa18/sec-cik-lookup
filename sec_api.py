@@ -33,6 +33,15 @@ def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
         print(f"❌ Failed to load fallback tags: {e}")
         return {}
 
+def get_filing_index(cik, accession):
+    acc_no_no_hyphens = accession.replace('-', '')
+    url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no_no_hyphens}/index.json"
+    try:
+        return safe_get(url).json()
+    except Exception:
+        fallback_url = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession}/index.json"
+        return safe_get(fallback_url).json()
+
 def get_sec_financials(cik):
     assert callable(parse_ixbrl_metrics), "❌ parse_ixbrl_metrics is not callable"  # ✅ defense
 
