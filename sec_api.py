@@ -147,7 +147,7 @@ def get_sec_financials(cik):
 
         if xbrl_url and xbrl_url.endswith(".xml"):
             xbrl_text = safe_get(xbrl_url).text
-            parsed_items = extract_line_items(xbrl_text, fallback_tags)
+            parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)
 
         elif doc.endswith(".htm") or doc.endswith(".html"):
             htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
