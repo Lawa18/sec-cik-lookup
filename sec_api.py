@@ -4,7 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from ixbrl_parser import parse_ixbrl_metrics  # ✅ final import
+from ixbrl_parser import parse_ixbrl_and_extract  # ✅ final import
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
