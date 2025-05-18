@@ -37,16 +37,17 @@ def find_xbrl_url(index_data):
     acc_no = accession.replace("-", "")
 
     # Fallback-safe cik extraction
-    cik = directory.get("cik")
-    if not cik:
+    cik_fallback = directory.get("cik")
+    if not cik_fallback:
+        # fallback only if directory['file'] exists and is structured correctly
         file_path = directory.get("file", "")
-        parts = file_path.split("/")
-        if len(parts) >= 3:
-            cik = parts[-3]
-            print(f"🧩 Recovered missing CIK from file path: {cik}")
-        else:
-            print("❌ Cannot determine CIK — directory['file'] is malformed or missing.")
-            return None
+        cik_parts = file_path.split("/")
+        cik_fallback = cik_parts[-3] if len(cik_parts) >= 3 else None
+
+    if not cik_fallback:
+        print("❌ Cannot determine CIK — directory['file'] is malformed or missing.")
+        return None
+
 
     print(f"🔎 Searching for instance XML in accession: {accession}")
 
