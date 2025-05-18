@@ -4,7 +4,6 @@ import warnings
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-    # ✅ Early check for malformed or tiny documents
     if not htm_text or len(htm_text) < 10000:
         print("❌ Invalid or too-small iXBRL HTML.")
         return {"error": "Downloaded iXBRL file is invalid or too small."}
@@ -39,4 +38,4 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
             extracted[metric] = "Missing tag"
 
     print(f"📊 Extracted {len(extracted)} iXBRL metrics.")
-    return extracted
+    return extracted  # ✅ THIS LINE IS ESSENTIAL
