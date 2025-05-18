@@ -38,4 +38,4 @@ def extract_line_items_from_ixbrl(htm_text, fallback_tags):
             extracted[metric] = "Missing tag"
 
     print(f"📊 Extracted {len(extracted)} iXBRL metrics.")
-    return extracted  # ✅ THIS LINE IS ESSENTIAL
+    return extracted
