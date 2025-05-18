@@ -4,7 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from extract_line_items_from_ixbrl import parse_ixbrl_and_extract  # ✅ updated name
+from extract_line_items_from_ixbrl import parse_ixbrl_and_extract  # ✅ final import name check
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
@@ -111,6 +111,8 @@ def get_filing_index(cik, accession):
         return safe_get(fallback_url).json()
 
 def get_sec_financials(cik):
+    assert callable(parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"  # ✅ defense
+
     data = fetch_sec_data(cik)
     if not data:
         return {
@@ -153,7 +155,6 @@ def get_sec_financials(cik):
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
 
-            # ✅ Updated to renamed function
             parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
