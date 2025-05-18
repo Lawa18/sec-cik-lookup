@@ -114,7 +114,7 @@ def get_fiscal_year_from_xbrl(xbrl_text):
     return None
 
 def get_sec_financials(cik):
-    assert callable(parse_ixbrl_metrics), "❌ parse_ixbrl_metrics is not callable"
+    assert callable(parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"
 
     data = fetch_sec_data(cik)
     if not data:
@@ -150,14 +150,14 @@ def get_sec_financials(cik):
 
         if xbrl_url and xbrl_url.endswith(".xml"):
             xbrl_text = safe_get(xbrl_url).text
-            parsed_items = extract_line_items(xbrl_text, fallback_tags)
+            parsed_items = parse_ixbrl_and_extract(xbrl_text, fallback_tags)  # ✅ FIXED HERE
 
         elif doc.endswith(".htm") or doc.endswith(".html"):
             htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
             print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
-            parsed_items = parse_ixbrl_metrics(htm_text, fallback_tags)
+            parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)  # ✅ FIXED HERE TOO
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
