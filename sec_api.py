@@ -4,10 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from flask import Flask, request, jsonify
 from extract_line_items_from_ixbrl import extract_line_items_from_ixbrl
-
-app = Flask(__name__)
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
@@ -36,10 +33,8 @@ def find_xbrl_url(index_data):
     items = directory.get("item", [])
     acc_no = accession.replace("-", "")
 
-    # Fallback-safe cik extraction
     cik_fallback = directory.get("cik")
     if not cik_fallback:
-        # fallback only if directory['file'] exists and is structured correctly
         file_path = directory.get("file", "")
         cik_parts = file_path.split("/")
         cik_fallback = cik_parts[-3] if len(cik_parts) >= 3 else None
@@ -48,14 +43,13 @@ def find_xbrl_url(index_data):
         print("❌ Cannot determine CIK — directory['file'] is malformed or missing.")
         return None
 
-
     print(f"🔎 Searching for instance XML in accession: {accession}")
 
     for file in items:
         name = file["name"].lower()
         print(f"📁 Checking file: {name}")
         if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-            path = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc_no}/{file['name']}"
+            path = f"https://www.sec.gov/Archives/edgar/data/{int(cik_fallback)}/{acc_no}/{file['name']}"
             print(f"✅ Selected XBRL instance file: {path}")
             return path
 
@@ -152,11 +146,15 @@ def get_sec_financials(cik):
         if xbrl_url and xbrl_url.endswith(".xml"):
             xbrl_text = safe_get(xbrl_url).text
             parsed_items = extract_line_items(xbrl_text, fallback_tags)
+
         elif doc.endswith(".htm") or doc.endswith(".html"):
             htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
             print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
+
+            # ✅ Ensure it's callable before using
+            assert callable(extract_line_items_from_ixbrl), "❌ Function extract_line_items_from_ixbrl is not callable!"
             parsed_items = extract_line_items_from_ixbrl(htm_text, fallback_tags)
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
@@ -176,8 +174,7 @@ def get_sec_financials(cik):
         [f for f in all_annuals if f["fiscalYear"]],
         key=lambda x: x["fiscalYear"],
         reverse=True
-    )[:1]  # Only 1 filing to stay within memory limits
-
+    )[:1]
 
     print("🔍 Extracted values for debugging:")
     for filing in historical_annuals:
@@ -223,25 +220,3 @@ def download_multiple_xbrl(cik, save_dir='xbrl_files'):
                 f.write(response.text)
             downloaded_files.append(filepath)
     return downloaded_files
-
-@app.route("/resolve_cik", methods=["GET"])
-def resolve_cik():
-    company = request.args.get("company", "")
-    if not company:
-        return jsonify({"error": "Missing 'company' query parameter"}), 400
-
-    try:
-        url = "https://www.sec.gov/files/company_tickers.json"
-        res = requests.get(url, headers=HEADERS)
-        res.raise_for_status()
-        tickers = res.json()
-        for entry in tickers.values():
-            if company.lower() in entry["title"].lower():
-                return jsonify({"cik": str(entry["cik_str"]).zfill(10)})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    return jsonify({"error": f"CIK not found for company: {company}"}), 404
-
-if __name__ == "__main__":
-    app.run(debug=True)
