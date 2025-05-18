@@ -4,7 +4,7 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from extract_line_items_from_ixbrl import extract_line_items_from_ixbrl
+from extract_line_items_from_ixbrl import parse_ixbrl_and_extract  # ✅ updated name
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
@@ -153,9 +153,8 @@ def get_sec_financials(cik):
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
 
-            # ✅ Ensure it's callable before using
-            assert callable(extract_line_items_from_ixbrl), "❌ Function extract_line_items_from_ixbrl is not callable!"
-            parsed_items = extract_line_items_from_ixbrl(htm_text, fallback_tags)
+            # ✅ Updated to renamed function
+            parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
