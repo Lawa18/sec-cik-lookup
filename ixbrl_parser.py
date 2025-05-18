@@ -1,7 +1,10 @@
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
 
-def parse_ixbrl_metrics(htm_text, fallback_tags):
+def parse_ixbrl_and_extract(htm_text, fallback_tags):
+    import warnings
+    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
     if not htm_text or len(htm_text) < 10000:
