@@ -3,6 +3,14 @@ import warnings
 
 def extract_line_items_from_ixbrl(htm_text, fallback_tags):
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+    
+    try:
+        print("🔍 Starting BeautifulSoup parse (html5lib)")
+        soup = BeautifulSoup(htm_text, "html5lib")
+        print("✅ Soup parsed successfully")
+    except Exception as e:
+        print(f"❌ Soup parse failed: {e}")
+        return {"error": f"Soup parse failed: {str(e)}"}
 
     # ✅ html5lib handles broken/massive iXBRL better than lxml
     soup = BeautifulSoup(htm_text, "html5lib")
