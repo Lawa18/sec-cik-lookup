@@ -25,6 +25,14 @@ def fetch_sec_data(cik):
         print(f"❌ ERROR: Failed to fetch SEC data for CIK {cik}: {e}")
         return {}
 
+def load_fallback_tags(filepath="grouped_fallbacks.yaml"):
+    try:
+        with open(filepath, "r") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"❌ Failed to load fallback tags: {e}")
+        return {}
+
 def get_sec_financials(cik):
     assert callable(parse_ixbrl_metrics), "❌ parse_ixbrl_metrics is not callable"  # ✅ defense
 
