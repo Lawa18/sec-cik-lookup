@@ -33,13 +33,25 @@ def find_xbrl_url(index_url):
     time.sleep(REQUEST_DELAY)
     response = fetch_with_retries(index_url)
     if not response:
+        print(f"❌ No response for index URL: {index_url}")
         return None
-    try:
-        if "directory" in response and "item" in response["directory"]:
-            for file in response["directory"]["item"]:
-                if file["name"].endswith(".xml") and not any(bad in file["name"].lower() for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
-                    return index_url.replace("index.json", file["name"])
 
-    except json.JSONDecodeError:
+    try:
+        directory = response.get("directory", {})
+        items = directory.get("item", [])
+        base_url = index_url.replace("index.json", "")
+
+        for file in items:
+            name = file["name"].lower()
+            print(f"📁 Checking file: {name}")
+            if name.endswith(".xml") and not any(bad in name for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
+                xbrl_url = base_url + file["name"]
+                print(f"✅ Found XBRL instance file: {xbrl_url}")
+                return xbrl_url
+
+        print("❌ No valid XBRL instance XML file found.")
         return None
-    return None
+
+    except Exception as e:
+        print(f"❌ Exception parsing index.json: {e}")
+        return None
