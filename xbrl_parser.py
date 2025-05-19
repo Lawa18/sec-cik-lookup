@@ -37,8 +37,9 @@ def find_xbrl_url(index_url):
     try:
         if "directory" in response and "item" in response["directory"]:
             for file in response["directory"]["item"]:
-                if file["name"].endswith(".xml") and "htm.xml" in file["name"]:
+                if file["name"].endswith(".xml") and not any(bad in file["name"].lower() for bad in ["_def", "_pre", "_lab", "_cal", "_sum", "schema"]):
                     return index_url.replace("index.json", file["name"])
+
     except json.JSONDecodeError:
         return None
     return None
