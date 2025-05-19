@@ -4,10 +4,10 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from ixbrl_parser import parse_ixbrl_and_extract  # ✅ final import
+from ixbrl_parser import parse_ixbrl_and_extract
 
 print("✅ ixbrl_parser imported successfully:", parse_ixbrl_and_extract)
-assert callable(parse_ixbrl_and_extract), "❌ Function is not callable"
+assert callable(parse_ixbrl_and_extract), f"❌ Function 'parse_ixbrl_and_extract' is NOT callable! Got: {type(parse_ixbrl_and_extract)}"
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
