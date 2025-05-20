@@ -4,10 +4,9 @@ import os
 import lxml.etree as ET
 import yaml
 import re
-from ixbrl_parser import parse_ixbrl_and_extract
+import ixbrl_parser  # ✅ final import with module namespace
 
-print("✅ ixbrl_parser imported successfully:", parse_ixbrl_and_extract)
-assert callable(parse_ixbrl_and_extract), f"❌ Function 'parse_ixbrl_and_extract' is NOT callable! Got: {type(parse_ixbrl_and_extract)}"
+assert callable(ixbrl_parser.parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"
 
 HEADERS = {
     'User-Agent': 'Lars Wallin (lars.e.wallin@gmail.com)',
@@ -114,7 +113,7 @@ def get_fiscal_year_from_xbrl(xbrl_text):
     return None
 
 def get_sec_financials(cik):
-    assert callable(parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"
+    assert callable(ixbrl_parser.parse_ixbrl_and_extract), "❌ parse_ixbrl_and_extract is not callable"
 
     data = fetch_sec_data(cik)
     if not data:
@@ -150,14 +149,14 @@ def get_sec_financials(cik):
 
         if xbrl_url and xbrl_url.endswith(".xml"):
             xbrl_text = safe_get(xbrl_url).text
-            parsed_items = parse_ixbrl_and_extract(xbrl_text, fallback_tags)  # ✅ FIXED HERE
+            parsed_items = ixbrl_parser.parse_ixbrl_and_extract(xbrl_text, fallback_tags)
 
         elif doc.endswith(".htm") or doc.endswith(".html"):
             htm_url = f"https://www.sec.gov/Archives/edgar/data/{cik}/{accession_number.replace('-', '')}/{doc}"
             print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
-            parsed_items = parse_ixbrl_and_extract(htm_text, fallback_tags)  # ✅ FIXED HERE TOO
+            parsed_items = ixbrl_parser.parse_ixbrl_and_extract(htm_text, fallback_tags)
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
