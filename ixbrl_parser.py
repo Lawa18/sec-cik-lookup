@@ -3,24 +3,25 @@ import warnings
 
 def parse_ixbrl_and_extract(htm_text, fallback_tags):
     print("🧪 ENTERED parse_ixbrl_and_extract()")
+    
     if htm_text is None:
         print("❌ htm_text is None")
-    elif not isinstance(htm_text, str):
-        print(f"❌ htm_text is not str — got {type(htm_text)}")
-    elif len(htm_text) < 10000:
-        print(f"❌ htm_text too short — len={len(htm_text)}")
+        return {"error": "htm_text is None"}
 
-def parse_ixbrl_and_extract(htm_text, fallback_tags):
+    if not isinstance(htm_text, str):
+        print(f"❌ htm_text is not str — got {type(htm_text)}")
+        return {"error": f"htm_text is not a string — got {type(htm_text)}"}
+
+    if len(htm_text) < 10000:
+        print(f"❌ htm_text too short — len={len(htm_text)}")
+        return {"error": f"htm_text too short: {len(htm_text)}"}
+
     # Suppress warnings for iXBRL being parsed as HTML
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-    if not htm_text or len(htm_text) < 10000:
-        print("❌ Invalid or too-small iXBRL HTML.")
-        return {"error": "Downloaded iXBRL file is invalid or too small."}
-
     try:
-        print("🔍 Starting BeautifulSoup parse (lxml)")  # ✅ Updated parser
-        soup = BeautifulSoup(htm_text, "lxml")           # ✅ Switched to lxml
+        print("🔍 Starting BeautifulSoup parse (html.parser)")  # ✅ Using low-memory parser
+        soup = BeautifulSoup(htm_text, "html.parser")
         print("✅ Soup parsed successfully")
     except Exception as e:
         print(f"❌ Soup parse failed: {e}")
