@@ -1,3 +1,5 @@
+print("🚀 Dummy change to force redeploy")
+
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
 
