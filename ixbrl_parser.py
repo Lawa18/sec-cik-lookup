@@ -1,5 +1,3 @@
-print("🚀 Dummy change to force redeploy")
-
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
 
@@ -12,8 +10,8 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
         return {"error": "Downloaded iXBRL file is invalid or too small."}
 
     try:
-        print("🔍 Starting BeautifulSoup parse (html5lib)")
-        soup = BeautifulSoup(htm_text, "html5lib")
+        print("🔍 Starting BeautifulSoup parse (lxml)")  # ✅ Updated parser
+        soup = BeautifulSoup(htm_text, "lxml")           # ✅ Switched to lxml
         print("✅ Soup parsed successfully")
     except Exception as e:
         print(f"❌ Soup parse failed: {e}")
