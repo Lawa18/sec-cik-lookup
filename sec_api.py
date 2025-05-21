@@ -158,8 +158,13 @@ def get_sec_financials(cik):
             print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
+
             try:
                 print("🧪 About to call ixbrl_parser.parse_ixbrl_and_extract...")
+                print("🔎 Type:", type(ixbrl_parser.parse_ixbrl_and_extract))
+                print("🔎 Repr:", repr(ixbrl_parser.parse_ixbrl_and_extract))
+                print("🔎 Dir:", dir(ixbrl_parser.parse_ixbrl_and_extract))
+
                 parsed_items = ixbrl_parser.parse_ixbrl_and_extract(htm_text, fallback_tags)
                 print("✅ Successfully called ixbrl_parser.parse_ixbrl_and_extract.")
             except Exception as e:
