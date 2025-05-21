@@ -158,7 +158,13 @@ def get_sec_financials(cik):
             print(f"🌐 Using iXBRL HTML: {htm_url}")
             htm_text = safe_get(htm_url).text
             xbrl_text = htm_text
-            parsed_items = ixbrl_parser.parse_ixbrl_and_extract(htm_text, fallback_tags)
+            try:
+                print("🧪 About to call ixbrl_parser.parse_ixbrl_and_extract...")
+                parsed_items = ixbrl_parser.parse_ixbrl_and_extract(htm_text, fallback_tags)
+                print("✅ Successfully called ixbrl_parser.parse_ixbrl_and_extract.")
+            except Exception as e:
+                print(f"❌ Exception during ixbrl_parser.parse_ixbrl_and_extract: {e}")
+                parsed_items = {"error": "iXBRL extraction failed"}
 
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
