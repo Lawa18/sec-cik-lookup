@@ -194,13 +194,13 @@ def get_sec_financials(cik):
         [f for f in all_annuals if f["fiscalYear"]],
         key=lambda x: x["fiscalYear"],
         reverse=True
-    )[:2]
+    )[:2]  # Capture 2 filings ≈ 4 years
 
     historical_quarters = sorted(
         all_quarters,
         key=lambda x: x["filingDate"],
         reverse=True
-    )[:4]
+    )[:4]  # Capture 4 filings ≈ 1 year
 
     print("🔍 Extracted values for debugging:")
     for filing in historical_annuals:
