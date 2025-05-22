@@ -137,9 +137,10 @@ def get_sec_financials(cik):
     combined.sort(key=lambda x: x[1], reverse=True)
     fallback_tags = load_fallback_tags()
     all_annuals = []
+    all_quarters = []
 
     for form, filing_date, accession_number, doc in combined:
-        if form not in ["10-K", "20-F"]:
+        if form not in ["10-K", "10-Q", "20-F"]:
             continue
 
         print(f"📄 Checking {form} filed on {filing_date}")
@@ -174,7 +175,7 @@ def get_sec_financials(cik):
         fiscal_year = get_fiscal_year_from_xbrl(xbrl_text or "")
         print(f"🗓️ Fiscal Year Detected: {fiscal_year}")
 
-        all_annuals.append({
+        filing_data = {
             "formType": form,
             "filingDate": filing_date,
             "fiscalYear": fiscal_year,
@@ -182,13 +183,24 @@ def get_sec_financials(cik):
             "xbrlUrl": xbrl_url,
             "xbrl_text": xbrl_text,
             "extracted": parsed_items
-        })
+        }
+
+        if form in ["10-K", "20-F"]:
+            all_annuals.append(filing_data)
+        elif form == "10-Q":
+            all_quarters.append(filing_data)
 
     historical_annuals = sorted(
         [f for f in all_annuals if f["fiscalYear"]],
         key=lambda x: x["fiscalYear"],
         reverse=True
-    )[:1]
+    )[:2]
+
+    historical_quarters = sorted(
+        all_quarters,
+        key=lambda x: x["filingDate"],
+        reverse=True
+    )[:4]
 
     print("🔍 Extracted values for debugging:")
     for filing in historical_annuals:
@@ -200,7 +212,7 @@ def get_sec_financials(cik):
         "company": data.get("name", "Unknown"),
         "cik": cik,
         "historical_annuals": historical_annuals,
-        "historical_quarters": []
+        "historical_quarters": historical_quarters
     }
 
 def get_company_sic_info(cik):
