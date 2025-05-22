@@ -16,21 +16,24 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
         print(f"❌ htm_text too short — len={len(htm_text)}")
         return {"error": f"htm_text too short: {len(htm_text)}"}
 
-    # Suppress iXBRL HTML parsing warnings
+    # Suppress known parsing warning from iXBRL
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
+    # Try preferred parser first (html5lib), then fall back
+    soup = None
     try:
-        print("🔍 Trying BeautifulSoup parse (html5lib)")
+        print("🔍 Parsing iXBRL with html5lib...")
         soup = BeautifulSoup(htm_text, "html5lib")
-        print("✅ html5lib parser succeeded")
-    except Exception as e:
-        print(f"⚠️ html5lib failed: {e} — trying lxml fallback")
+        print("✅ html5lib parse successful")
+    except Exception as e1:
+        print(f"⚠️ html5lib failed: {e1}")
         try:
-            soup = BeautifulSoup(htm_text, "lxml")
-            print("✅ lxml fallback succeeded")
+            print("🔁 Fallback: Parsing with html.parser...")
+            soup = BeautifulSoup(htm_text, "html.parser")
+            print("✅ html.parser fallback successful")
         except Exception as e2:
-            print(f"❌ Both parsers failed: {e2}")
-            return {"error": f"Both html5lib and lxml failed: {e2}"}
+            print(f"❌ html.parser fallback also failed: {e2}")
+            return {"error": "Soup parse failed for both html5lib and html.parser"}
 
     extracted = {}
 
@@ -51,6 +54,7 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
                         extracted[metric] = text
                     found = True
                     break
+
             if found:
                 break
 
