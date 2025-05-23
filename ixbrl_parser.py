@@ -16,10 +16,9 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
         print(f"❌ htm_text too short — len={len(htm_text)}")
         return {"error": f"htm_text too short: {len(htm_text)}"}
 
-    # Suppress known parsing warning from iXBRL
+    # Suppress warnings for iXBRL being parsed as HTML
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-    # Try preferred parser first (html5lib), then fall back
     soup = None
     try:
         print("🔍 Parsing iXBRL with html5lib...")
