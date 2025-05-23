@@ -16,7 +16,6 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
         print(f"❌ htm_text too short — len={len(htm_text)}")
         return {"error": f"htm_text too short: {len(htm_text)}"}
 
-    # Suppress warnings for iXBRL being parsed as HTML
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
     soup = None
@@ -53,10 +52,8 @@ def parse_ixbrl_and_extract(htm_text, fallback_tags):
                         extracted[metric] = text
                     found = True
                     break
-
             if found:
                 break
-
         if not found:
             extracted[metric] = "Missing tag"
 
